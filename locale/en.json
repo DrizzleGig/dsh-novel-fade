@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "title": "Fade",
+    "description": "Writing a novel of hundreds of thousands, even millions, of words with AI — but always worried it will forget earlier plot, characters and foreshadowing? Loading piles of old chapters into the context every time is not only costly; it also crowds out the room that should go to actual creation. Fade gives the AI a long-form memory that gradually fades: the recent plot stays sharp, the distant story keeps its key points, and important characters and events can be recalled whenever needed. When a chapter is finished, its memory is organized and its text archived automatically — no need to carry the whole novel around. Cut unnecessary token consumption, keep more context and budget for the chapters ahead, and let AI help you write a longer story."
+  },
+  "mode": {
+    "on": "Fade: on",
+    "off": "Fade: off",
+    "loading": "Fade",
+    "error": "Fade!"
+  }
+}

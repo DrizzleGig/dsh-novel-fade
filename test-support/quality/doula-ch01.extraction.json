@@ -1,0 +1,138 @@
+{
+  "source": "human-baseline-for-evaluator-only",
+  "chapter": 1,
+  "cards": [
+    {
+      "id": "c1",
+      "chapter": 1,
+      "topic": "陈霆回府",
+      "gist": "陈霆回府先问少爷，随后在井边和陈凡谈话；他是龙骧侯、魂圣，奉命守矿。",
+      "emotion": "克制",
+      "quote": "少爷呢？",
+      "entityIds": ["e:陈凡", "e:陈霆"],
+      "placeId": "p:龙骧侯府",
+      "domain": "key",
+      "salience": 4,
+      "source": "author"
+    },
+    {
+      "id": "c2",
+      "chapter": 1,
+      "topic": "明天测武魂",
+      "gist": "陈凡六岁，明天进宫测武魂。",
+      "emotion": "紧绷",
+      "quote": "明天进宫，宫里给你测武魂。",
+      "entityIds": ["e:陈凡", "e:陈霆"],
+      "placeId": "p:龙骧侯府",
+      "domain": "key",
+      "salience": 5,
+      "source": "author"
+    },
+    {
+      "id": "c3",
+      "chapter": 1,
+      "topic": "陈霆的提醒",
+      "gist": "陈霆告诉陈凡，武魂决定走多远，但走不走得下去看人。",
+      "emotion": "沉稳",
+      "quote": "武魂决定你能走多远。但走不走得下去，看的是人。",
+      "entityIds": ["e:陈凡", "e:陈霆"],
+      "domain": "key",
+      "salience": 4,
+      "source": "author"
+    },
+    {
+      "id": "c4",
+      "chapter": 1,
+      "topic": "陈凡的紧张",
+      "gist": "陈凡嘴上说不紧张，手指却在抠石头，被陈霆看穿。",
+      "emotion": "窘迫",
+      "quote": "你手指在抠石头。",
+      "entityIds": ["e:陈凡", "e:陈霆"],
+      "domain": "normal",
+      "salience": 3,
+      "source": "author"
+    },
+    {
+      "id": "c5",
+      "chapter": 1,
+      "topic": "独孤博之死",
+      "gist": "六年前的陨石雨把落日森林砸出大坑，冰火两仪眼毁了，独孤博死在雨里。",
+      "emotion": "冷",
+      "quote": "毒斗罗独孤博，死在那场雨里。",
+      "entityIds": ["e:独孤博", "e:冰火两仪眼"],
+      "placeId": "p:落日森林",
+      "domain": "key",
+      "salience": 5,
+      "source": "author"
+    },
+    {
+      "id": "c6",
+      "chapter": 1,
+      "topic": "旧时间线",
+      "gist": "唐昊重伤千寻疾，教皇死后昊天宗封山；这是原著开始前的旧事。",
+      "emotion": "冷静",
+      "quote": "昊天斗罗唐昊，重伤武魂殿教皇千寻疾。",
+      "entityIds": ["e:唐昊", "e:千寻疾", "e:昊天宗"],
+      "domain": "key",
+      "salience": 4,
+      "source": "author"
+    },
+    {
+      "id": "c7",
+      "chapter": 1,
+      "topic": "仙草断绝",
+      "gist": "冰火两仪眼毁了，仙草一株不剩；陈凡知道原著里的捷径没有了。",
+      "emotion": "空",
+      "quote": "冰火两仪眼，毁了。",
+      "entityIds": ["e:陈凡", "e:冰火两仪眼"],
+      "placeId": "p:落日森林",
+      "domain": "key",
+      "salience": 5,
+      "source": "author"
+    },
+    {
+      "id": "c8",
+      "chapter": 1,
+      "topic": "靠自己",
+      "gist": "陈凡带着前世记忆，知道这不是原著剧情；他决定不再指望仙草，从明天起靠自己。",
+      "emotion": "决意",
+      "quote": "从明天起，他得靠自己了。",
+      "entityIds": ["e:陈凡"],
+      "domain": "key",
+      "salience": 5,
+      "source": "author"
+    }
+  ],
+  "sheet": {
+    "scene": {
+      "location": "龙骧侯府后院井边",
+      "time": "夜",
+      "entities": ["陈凡", "陈霆"],
+      "props": ["老井", "槐树"]
+    },
+    "beats": [
+      "陈霆回府先问少爷，在井边坐下。",
+      "陈霆告诉陈凡明天进宫测武魂。",
+      "陈凡说不紧张，手指却在抠石头。",
+      "陈霆说武魂决定走多远，人决定走不走得下去。",
+      "陈凡想起陨石雨毁掉冰火两仪眼、独孤博死在雨里。",
+      "陈凡决定从明天起靠自己。"
+    ],
+    "keyLines": [
+      "武魂决定你能走多远。但走不走得下去，看的是人。",
+      "从明天起，他得靠自己了。"
+    ],
+    "ending": "明天。",
+    "openThreads": ["明天测武魂会测出什么", "冰火两仪眼被毁是否与陈凡穿越有关"]
+  },
+  "chapterMeta": {
+    "chapterId": "1",
+    "title": "穿越斗罗大陆 独孤博之死",
+    "role": "开篇",
+    "highlight": true,
+    "climaxLevel": 1,
+    "intensity": 0.6,
+    "source": "author",
+    "authorSalience": 0.9
+  }
+}

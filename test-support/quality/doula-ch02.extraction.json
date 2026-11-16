@@ -1,0 +1,126 @@
+{
+  "source": "human-baseline-for-evaluator-only",
+  "chapter": 2,
+  "cards": [
+    {
+      "id": "c1",
+      "chapter": 2,
+      "topic": "雪珂觉醒",
+      "gist": "雪珂觉醒天鹅武魂，先天魂力六级。",
+      "emotion": "明亮",
+      "quote": "天鹅武魂，先天魂力六级。",
+      "entityIds": ["e:雪珂"],
+      "placeId": "p:天斗皇宫",
+      "domain": "key",
+      "salience": 4,
+      "source": "author"
+    },
+    {
+      "id": "c2",
+      "chapter": 2,
+      "topic": "陈凡觉醒",
+      "gist": "陈凡觉醒天青牛蟒，先天满魂力十级。",
+      "emotion": "震动",
+      "quote": "十级！先天满魂力！",
+      "entityIds": ["e:陈凡", "e:天青牛蟒"],
+      "placeId": "p:天斗皇宫",
+      "domain": "key",
+      "salience": 5,
+      "source": "author"
+    },
+    {
+      "id": "c3",
+      "chapter": 2,
+      "topic": "藏住本体武魂",
+      "gist": "本体武魂差点跟着觉醒出来，陈凡把它藏了回去。",
+      "emotion": "惊险",
+      "quote": "本体武魂差点跟着出来。",
+      "entityIds": ["e:陈凡"],
+      "placeId": "p:天斗皇宫",
+      "domain": "key",
+      "salience": 5,
+      "source": "author"
+    },
+    {
+      "id": "c4",
+      "chapter": 2,
+      "topic": "皇室投资",
+      "gist": "雪夜大帝把陈凡当必须留下的天才，赐玉牌、侯爵年俸，并派魂斗罗为陈凡猎第一魂环。",
+      "emotion": "重",
+      "quote": "朕赐你玉牌一枚，可自由出入皇室藏书阁；年俸按侯爵例。另外，朕再派一位魂斗罗，专门为你猎取第一魂环。",
+      "entityIds": ["e:陈凡", "e:雪夜大帝"],
+      "placeId": "p:天斗皇宫",
+      "domain": "key",
+      "salience": 5,
+      "source": "author"
+    },
+    {
+      "id": "c5",
+      "chapter": 2,
+      "topic": "偏殿留人",
+      "gist": "仪式结束后，皇帝让陈凡去偏殿，他被单独留下。",
+      "emotion": "不安",
+      "quote": "请少爷去偏殿。",
+      "entityIds": ["e:陈凡", "e:雪夜大帝"],
+      "placeId": "p:天斗皇宫",
+      "domain": "key",
+      "salience": 4,
+      "source": "author"
+    },
+    {
+      "id": "c6",
+      "chapter": 2,
+      "topic": "雪清河的身份",
+      "gist": "陈凡认出雪清河就是千仞雪，武魂殿圣女，在天斗皇宫藏了十几年。",
+      "emotion": "冷",
+      "quote": "千仞雪。武魂殿的圣女，在天斗皇宫里藏了十几年的那个人。",
+      "entityIds": ["e:雪清河", "e:千仞雪"],
+      "placeId": "p:天斗皇宫",
+      "domain": "key",
+      "salience": 5,
+      "source": "author"
+    },
+    {
+      "id": "c7",
+      "chapter": 2,
+      "topic": "雪珂的注意",
+      "gist": "雪珂在觉醒仪式上一直注意陈凡。",
+      "emotion": "好奇",
+      "quote": "刚才那个叫雪珂的小姑娘也在看他。",
+      "entityIds": ["e:雪珂", "e:陈凡"],
+      "placeId": "p:天斗皇宫",
+      "domain": "normal",
+      "salience": 3,
+      "source": "author"
+    }
+  ],
+  "sheet": {
+    "scene": {
+      "location": "天斗皇宫觉醒殿",
+      "time": "白天",
+      "entities": ["陈凡", "雪珂", "雪夜大帝", "雪清河"],
+      "props": ["觉醒石", "玉牌"]
+    },
+    "beats": [
+      "雪珂先觉醒天鹅武魂，先天六级。",
+      "陈凡觉醒天青牛蟒，先天满魂力十级。",
+      "本体武魂差点跟着出来，被陈凡藏回去。",
+      "雪夜大帝赐玉牌、年俸、魂斗罗猎环。",
+      "仪式后陈凡被请去偏殿。",
+      "陈凡认出雪清河就是千仞雪。"
+    ],
+    "keyLines": ["十级！先天满魂力！", "请少爷去偏殿。"],
+    "ending": "他抬头看了一眼偏殿的方向。",
+    "openThreads": ["偏殿里等着什么", "雪清河是否看出本体武魂"]
+  },
+  "chapterMeta": {
+    "chapterId": "2",
+    "title": "天斗皇宫 武魂觉醒仪式",
+    "role": "升级",
+    "highlight": true,
+    "climaxLevel": 2,
+    "intensity": 0.75,
+    "source": "author",
+    "authorSalience": 0.9
+  }
+}

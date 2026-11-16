@@ -1,0 +1,127 @@
+{
+  "source": "human-baseline-for-evaluator-only",
+  "chapter": 3,
+  "cards": [
+    {
+      "id": "c1",
+      "chapter": 3,
+      "topic": "十级确认",
+      "gist": "陈凡魂力十级，先天满魂力确认。",
+      "emotion": "稳",
+      "quote": "先天满魂力，没错。",
+      "entityIds": ["e:陈凡"],
+      "placeId": "p:天斗皇宫",
+      "domain": "key",
+      "salience": 4,
+      "source": "author"
+    },
+    {
+      "id": "c2",
+      "chapter": 3,
+      "topic": "风雷双属",
+      "gist": "天青牛蟒是风雷双属变异武魂，和魂兽谱上的水雷双属不同。",
+      "emotion": "异",
+      "quote": "风雷双属。",
+      "entityIds": ["e:陈凡", "e:天青牛蟒"],
+      "placeId": "p:天斗皇宫",
+      "domain": "key",
+      "salience": 5,
+      "source": "author"
+    },
+    {
+      "id": "c3",
+      "chapter": 3,
+      "topic": "迟缓领域",
+      "gist": "迟缓领域出现，范围只有三尺，效果单一，只能迟滞。",
+      "emotion": "压迫",
+      "quote": "范围很小，只有三尺；效果也单一，只能迟滞。",
+      "entityIds": ["e:陈凡"],
+      "placeId": "p:天斗皇宫",
+      "domain": "key",
+      "salience": 5,
+      "source": "author"
+    },
+    {
+      "id": "c4",
+      "chapter": 3,
+      "topic": "本体武魂压回",
+      "gist": "本体武魂差点跟着领域出来，被陈凡压了回去；陈凡决定继续藏住它。",
+      "emotion": "险",
+      "quote": "本体武魂。",
+      "entityIds": ["e:陈凡"],
+      "placeId": "p:天斗皇宫",
+      "domain": "key",
+      "salience": 5,
+      "source": "author"
+    },
+    {
+      "id": "c5",
+      "chapter": 3,
+      "topic": "学院名额",
+      "gist": "雪夜大帝赐天斗皇家学院初级部名额，今年秋天入学。",
+      "emotion": "重",
+      "quote": "天斗皇家学院，初级部，今年秋天入学。",
+      "entityIds": ["e:陈凡", "e:雪夜大帝"],
+      "placeId": "p:天斗皇宫",
+      "domain": "key",
+      "salience": 5,
+      "source": "author"
+    },
+    {
+      "id": "c6",
+      "chapter": 3,
+      "topic": "老三的怀疑",
+      "gist": "送陈凡出宫的老三低声问他，丹田里是不是还有别的东西。",
+      "emotion": "警觉",
+      "quote": "你丹田里，还有别的东西吧？",
+      "entityIds": ["e:陈凡", "e:老三"],
+      "placeId": "p:天斗皇宫",
+      "domain": "key",
+      "salience": 4,
+      "source": "author"
+    },
+    {
+      "id": "c7",
+      "chapter": 3,
+      "topic": "东宫邀请",
+      "gist": "雪清河在宫门外邀陈凡以后去东宫问他。",
+      "emotion": "试探",
+      "quote": "以后若有什么不懂的，可以来东宫问我。",
+      "entityIds": ["e:陈凡", "e:雪清河"],
+      "placeId": "p:天斗皇宫",
+      "domain": "key",
+      "salience": 4,
+      "source": "author"
+    }
+  ],
+  "sheet": {
+    "scene": {
+      "location": "天斗皇宫偏殿与宫门",
+      "time": "白天",
+      "entities": ["陈凡", "老三", "雪夜大帝", "雪清河"],
+      "props": ["觉醒石", "东宫玉牌"]
+    },
+    "beats": [
+      "老者确认陈凡魂力十级。",
+      "天青牛蟒显出风雷双属变异。",
+      "迟缓领域铺开，只有三尺。",
+      "本体武魂差点出来，被陈凡压回。",
+      "雪夜大帝赐天斗皇家学院名额。",
+      "老三怀疑陈凡丹田里还有东西。",
+      "雪清河邀他去东宫。"
+    ],
+    "keyLines": ["风雷双属。", "你丹田里，还有别的东西吧？"],
+    "ending": "他丹田深处那层青鳞，刚才差一点就翻出来了。",
+    "openThreads": ["老三是否看破本体武魂", "雪清河为什么邀他去东宫"]
+  },
+  "chapterMeta": {
+    "chapterId": "3",
+    "title": "迟缓领域 本体武魂！",
+    "role": "升级",
+    "highlight": true,
+    "climaxLevel": 2,
+    "intensity": 0.8,
+    "source": "author",
+    "authorSalience": 0.9
+  }
+}

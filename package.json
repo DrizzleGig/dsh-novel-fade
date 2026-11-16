@@ -1,0 +1,96 @@
+{
+  "name": "dsh-novel-fade",
+  "version": "0.6.0",
+  "description": "想用 AI 写几十万字、上百万字的长篇小说，却总担心 AI 忘记前面的剧情、人物和伏笔？每次都把大量旧章节塞进上下文，不仅费钱，还会挤占真正用于创作的空间。「褪色」让 AI 拥有一套会逐渐淡化的长篇记忆：最近的剧情记得清楚，久远的故事保留重点，重要人物和事件随时可以找回。写完一章自动整理记忆、保存原文，不必反复携带整部小说。减少不必要的 Token 消耗，把更多上下文和预算留给后续创作，让 AI 陪你把故事写得更长。",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./icon": "./icon.svg",
+    "./client": "./client.js",
+    "./remote": "./lib/remote.js",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check index.js && node --check client.js && node --check lib/remote.js && node --check lib/remote-contract.js && node --check lib/panel.js && node --check lib/source.js && node scripts/check-surface.mjs",
+    "smoke": "node scripts/smoke-3ch.mjs",
+    "quality": "node scripts/quality-eval.mjs",
+    "quality:check": "node scripts/quality-eval.mjs --check",
+    "quality:briefs": "node scripts/quality-briefs.mjs"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "lib",
+    "locale",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "novel",
+    "novel-writing",
+    "memory",
+    "long-form",
+    "context",
+    "forgetting-curve",
+    "sidebar"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "author": "DrizzleGig",
+  "contributors": [
+    {
+      "name": "MiyueWinter",
+      "email": "mingyue_11129@qq.com",
+      "url": "https://github.com/MiyueWinter"
+    }
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/dsh-session": "*",
+    "@deepseek-ai/dsh-typert-protocol": "*"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-session": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-typert-protocol": {
+      "optional": true
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DrizzleGig/dsh-novel-fade.git"
+  },
+  "homepage": "https://github.com/DrizzleGig/dsh-novel-fade",
+  "bugs": {
+    "url": "https://github.com/DrizzleGig/dsh-novel-fade/issues"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-commands",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

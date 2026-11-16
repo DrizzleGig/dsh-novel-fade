@@ -1,0 +1,5 @@
+- insert:
+    - id: novel-fade
+      name: 'dsh-novel-fade'
+    - id: novel-fade-remote
+      name: 'dsh-novel-fade/remote'

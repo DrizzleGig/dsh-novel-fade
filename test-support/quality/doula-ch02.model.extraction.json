@@ -1,0 +1,152 @@
+{
+  "source": "model-subagent-baseline-2026-11-13",
+  "chapter": 2,
+  "cards": [
+    {
+      "id": "c2_01",
+      "chapter": 2,
+      "topic": "境界/能力",
+      "gist": "陈凡在觉醒殿将手按上觉醒石，觉醒出天青牛蟒武魂，紫电青风缠绕，白袍老者宣布先天魂力十级——先天满魂力，殿内哗然。",
+      "emotion": "压抑多年后的释然与震动",
+      "emotionIntensity": 0.95,
+      "salience": 5,
+      "domain": "key",
+      "entityIds": ["chenfan", "baipao_laozhe", "xueye_dadi", "chenting"],
+      "placeId": "tiandou_juexingdian",
+      "quote": "十级！先天满魂力！",
+      "cause": "陈凡把手放上三米高的觉醒石，石中温热力量涌入丹田，沉睡之物一下睁眼。",
+      "effect": "天青牛蟒虚影升空、先天满魂力曝光，陈凡从侯府独子变为天斗帝国多年未遇的满魂力天才。"
+    },
+    {
+      "id": "c2_02",
+      "chapter": 2,
+      "topic": "关键道具",
+      "gist": "雪夜大帝当殿赐下藏书阁通行玉牌，凭此可自由出入皇室藏书阁，成为陈凡接触帝国核心典籍的长期凭证。",
+      "emotion": "受宠若惊下的克制",
+      "emotionIntensity": 0.6,
+      "salience": 4,
+      "domain": "normal",
+      "entityIds": ["chenfan", "xueye_dadi"],
+      "placeId": "tiandou_juexingdian",
+      "quote": "朕赐你玉牌一枚",
+      "cause": "陈凡觉醒先天满魂力，雪夜大帝当场做出皇室投资的决定。",
+      "effect": "玉牌落入陈凡手中，皇室藏书阁对他开放，后续获取功法与情报有了合法通道。"
+    },
+    {
+      "id": "c2_03",
+      "chapter": 2,
+      "topic": "承诺/债务",
+      "gist": "觉醒殿内雪夜大帝赐玉牌、按侯爵例给年俸、再派一位魂斗罗专为陈凡猎取第一魂环；陈霆跪地谢恩，这份隆恩变成父子欠下的皇室人情。",
+      "emotion": "荣耀与压力并存的沉重",
+      "emotionIntensity": 0.75,
+      "salience": 4,
+      "domain": "key",
+      "entityIds": ["xueye_dadi", "chenfan", "chenting"],
+      "placeId": "tiandou_juexingdian",
+      "quote": "年俸按侯爵例。",
+      "cause": "满魂力天赋让雪夜大帝断定天斗帝国将再出一位封号斗罗。",
+      "effect": "陈凡获得实质资源与魂环保障，同时被绑上皇室战车，日后难以中立。"
+    },
+    {
+      "id": "c2_04",
+      "chapter": 2,
+      "topic": "因果",
+      "gist": "满魂力曝光的同时，陈凡感到丹田深处另一副骨架正贴着皮肉往外撑——本体武魂差点跟着现身，他不动声色把它压回去，因为殿里六位魂斗罗与雪夜大帝都在看着。",
+      "emotion": "惊惧后的冷静伪装",
+      "emotionIntensity": 0.85,
+      "salience": 5,
+      "domain": "key",
+      "entityIds": ["chenfan", "xueye_dadi", "baipao_laozhe"],
+      "placeId": "tiandou_juexingdian",
+      "quote": "现在不是露它的时候。",
+      "cause": "天青牛蟒觉醒牵动丹田深处第二层力量，青鳞之下骨架外撑。",
+      "effect": "陈凡主动隐藏本体武魂，埋下双生武魂的秘密与日后暴露的风险。"
+    },
+    {
+      "id": "c2_05",
+      "chapter": 2,
+      "topic": "关系变化",
+      "gist": "觉醒殿内，雪清河在陈凡觉醒满魂力后笑容未变，目光却在他身上停得比刚才久了一点——伪装成太子的千仞雪开始重新评估这个龙骧侯独子。",
+      "emotion": "温和笑意下的审视",
+      "emotionIntensity": 0.6,
+      "salience": 4,
+      "domain": "normal",
+      "entityIds": ["xueqinghe", "chenfan"],
+      "placeId": "tiandou_juexingdian",
+      "quote": "目光却在他身上停得比刚才久了一点",
+      "cause": "陈凡当殿暴露先天满魂力，打破雪清河对在场孩童的原有判断。",
+      "effect": "陈凡被武魂殿圣女列入观察名单，宫中多了一双暗中盯着他的眼睛。"
+    },
+    {
+      "id": "c2_06",
+      "chapter": 2,
+      "topic": "死亡/退场",
+      "gist": "觉醒殿内，雪珂公主觉醒天鹅武魂、先天魂力六级，皇帝只说“不错，下去吧”；她脸白了一下仍背挺笔直退回座位，自此被叙事轻轻放下。",
+      "emotion": "失落却强撑的自尊",
+      "emotionIntensity": 0.5,
+      "salience": 2,
+      "domain": "normal",
+      "entityIds": ["xueke", "xueye_dadi", "chenfan"],
+      "placeId": "tiandou_juexingdian",
+      "quote": "后来好像没什么戏份",
+      "cause": "六级魂力在皇室子弟中不算出挑，未获父皇额外青眼。",
+      "effect": "雪珂退场，成为陈凡对照自身天赋的参照物，也留下一个被冷落的公主伏笔。"
+    },
+    {
+      "id": "c2_07",
+      "chapter": 2,
+      "topic": "地点重访",
+      "gist": "陈凡坐在驶入宫门的马车上掀帘看天斗皇宫：汉白玉城墙如山、纯金大门刻九条五爪金龙——原著里写过很多次的地方，亲眼看到仍然不同。",
+      "emotion": "穿越者对原著名场面的复杂打量",
+      "emotionIntensity": 0.55,
+      "salience": 3,
+      "domain": "normal",
+      "entityIds": ["chenfan"],
+      "placeId": "tiandou_huanggong",
+      "quote": "原著里写过很多次的皇宫，亲眼看到，还是不一样",
+      "cause": "六岁这年随父亲入宫参加武魂觉醒仪式，第一次真正踏进天斗皇宫。",
+      "effect": "皇宫从文字变为可感空间，陈凡的穿越者视角与原著记忆正式叠合。"
+    }
+  ],
+  "sheet": {
+    "scene": {
+      "location": "天斗皇宫·觉醒殿",
+      "time": "天未亮出发，仪式至正午散场",
+      "entities": ["陈凡", "陈霆", "苏婉", "雪夜大帝", "雪清河(千仞雪)", "雪珂公主", "六名白袍老者", "内侍", "金甲御林军"],
+      "props": ["三米高乳白觉醒石", "绣紫色雷纹的白色礼服", "侯爵玉印", "赤鳞马", "皇室藏书阁玉牌"]
+    },
+    "beats": [
+      "天未亮侍女第三次催促，陈凡换上雷纹白礼服，随陈霆、苏婉乘车入宫。",
+      "天斗皇宫汉白玉城墙与九条五爪金龙的纯金大门前，陈凡掀帘观望。",
+      "觉醒殿外贵族云集，陈霆一到便被众人围迎，手始终按在陈凡肩上。",
+      "雪珂公主觉醒天鹅武魂、先天魂力六级，皇帝只道“不错，下去吧”。",
+      "陈凡按上觉醒石，天青牛蟒虚影升空，先天满魂力十级震动全殿。",
+      "雪夜大帝连说三个好，赐玉牌、侯爵例年俸，并派魂斗罗为其猎取第一魂环。",
+      "陈凡察觉本体武魂将出，不动声色压下，决定现在不露。",
+      "散场后陈霆低声道“好小子”，苏婉手指发抖；内侍追来传旨，召陈凡入偏殿。"
+    ],
+    "keyLines": [
+      "十级！先天满魂力！",
+      "现在不是露它的时候。"
+    ],
+    "ending": "殿门半掩着，里面很暗。",
+    "openThreads": [
+      "本体武魂究竟是什么，何时会暴露",
+      "雪夜大帝没说完的“不止是封号斗罗”指什么",
+      "偏殿召见是赏是试探，殿门半掩之后有什么",
+      "千仞雪对陈凡的注意会如何转为行动",
+      "六位魂斗罗与藏书阁资源将如何被陈凡使用",
+      "雪珂公主的退场是否留作后文伏笔"
+    ]
+  },
+  "chapterMeta": {
+    "chapterId": "2",
+    "title": "天斗皇宫 武魂觉醒仪式",
+    "role": "实力亮相与皇室押注",
+    "highlight": true,
+    "climaxLevel": 3,
+    "intensity": 0.85,
+    "source": "model",
+    "authorSalience": 0.9
+  }
+}

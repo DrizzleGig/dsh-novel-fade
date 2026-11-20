@@ -1,5 +1,5 @@
 /**
- * dsh-novel-fade — 有损记忆 / 小说记忆插件（v0.6.0）
+ * dsh-novel-fade — 有损记忆 / 小说记忆插件（v0.7.0）
  *
  * 独立运行：不 import beat，不调用 beat 工具。
  * 装了 dsh-novel-beat 时，只读 <dir>/.dsh-novel-beat/<book>/book.json 做增强。
@@ -8,6 +8,9 @@
  */
 import { toolDefinitions } from './lib/tools.js'
 import { getSessionMode, setSessionMode } from './lib/store.js'
+import { createFadeService } from './lib/service.js'
+
+const VERSION = '0.7.0'
 
 export const inject = ['tools', 'commands', 'workingDirectory', 'agents']
 
@@ -27,9 +30,9 @@ const SKILL = {
     '',
     '0. 所有 `memo_*` 的 `dir` 必须传**工作区根目录**，不要传 `正文/`、`章节目录/`。传了章节目录时工具会自动上移，但不要依赖它。',
     '1. 写下一章前：调用 `memo_brief`，先拿简报再动笔。',
-    '2. 写完一章后：**立即**调用 `memo_digest`，把本章正文路径和事件卡提交；通常 3–7 张，L0 硬契约多时不受此限（最多 24）。只把正文写进编辑器不算沉淀。',
+    '2. 写完一章后：**立即**调用 `memo_digest`，把本章正文路径和事件卡提交；通常 3–7 张，L0 硬契约多时不受此限（最多 24）。只把正文写进编辑器不算沉淀。返回的 `receipt`（revision / artifactId / hash）是这一章落账的凭据，不要丢；重做同章传 `replace:true`。',
     '3. 用户只让你改正文、或你是在“作家助手”里手写：保存/复制正文后，仍要执行第 2 步；不能因为没经过 `novel_write_chapter` 就跳过。',
-    '4. 下一章开写前 `memo_state` 检查：缺 digest 的章、未确认高光、到期 thread 先处理。',
+    '4. 下一章开写前 `memo_state` 检查：缺 digest 的章、未确认高光、到期 thread 先处理；`health` 里的 block/warn 优先看。',
     '',
     '## 七个工具',
     '',
@@ -37,9 +40,9 @@ const SKILL = {
     '- `memo_digest(dir, book, chapter, text|path, cards, sheet)`：写完一章后沉淀。quote/ending/keyLines 必须逐字来自正文；没给 cards 只预览。默认顺手把本章正文存进「原文贮存」（只存不用；要关传 `source:false`）。',
     '- `memo_recall(dir, book, chapter, query|entity|place)`：需要精确细节时翻记忆；`deep:true` 才读原文。',
     '- `memo_forget(dir, book, ids|query, reason, confirm, force)`：作者主权，软删除；先预览再确认。L0 硬契约默认拒删，只有作者明确要求并传 `force:true` 才能删，且写审计。',
-    '- `memo_state(dir, book, chapter)`：记忆体检；含 L0/L1/L2/L3 分布与未解决硬契约。',
+    '- `memo_state(dir, book, chapter)`：记忆体检；含 L0/L1/L2/L3 分布、未解决硬契约，以及结构化 `health`（L0_OVERLOAD / THREAD_OVERDUE / SOURCE_MISSING / REVISION_DRIFT 等）。',
     '- `memo_ingest(dir, book, chapter, text|path)`：给**旧章**补原文储备（digest 已自动存新章）；不写记忆卡、不调用模型。',
-    '- `memo_source(dir, book, chapter, query|from|len)`：卡被褪掉、要核对原句时才读一小段（≤4000 字）。',
+    '- `memo_source(dir, book, chapter, query|from|len)`：卡被褪掉、要核对原句时才读一小段（≤4000 字）；返回 offset/sha256/stale，原文改过会明确标记，不要假装定位准确。',
     '',
     '## 四层记忆',
     '',
@@ -79,6 +82,10 @@ function sessionKey(context) {
 const TOOL_NAMES = toolDefinitions().map((definition) => definition.name)
 
 export async function apply(ctx) {
+  const service = createFadeService({ version: VERSION })
+  if (typeof ctx.provide === 'function') {
+    ctx.effect(() => ctx.provide('novelFade', service))
+  }
   const commands = ctx.get('commands')
   const workingDirectory = ctx.get('workingDirectory')
   const agents = ctx.get('agents')

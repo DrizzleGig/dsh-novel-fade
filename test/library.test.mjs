@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
+  libraryEntry,
   libraryPath,
   markMissing,
   readLibrary,
@@ -23,6 +24,19 @@ async function withHome(fn) {
     await rm(home, { recursive: true, force: true })
   }
 }
+
+test('library: entry contentRevision comes from meta.revision, not a guessed count', () => {
+  const entry = libraryEntry({
+    dir: 'D:\\workspace\\book',
+    book: '书',
+    memory: {
+      meta: { revision: 9 },
+      chapters: { 1: {}, 2: {} },
+      cards: [{}, {}],
+    },
+  })
+  assert.equal(entry.contentRevision, 9)
+})
 
 test('library: upsert, revision bump and read back', () => withHome(async () => {
   const first = await upsertLibraryBook({

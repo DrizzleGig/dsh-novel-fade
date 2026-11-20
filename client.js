@@ -378,7 +378,62 @@ window.__ModuleLoader__.load({
     /* ════════════════════════════════════════════════════════════════════════
      * 5. Overview
      * ════════════════════════════════════════════════════════════════════════ */
-    function Overview({ snapshot, mode, onToggleMode, onGo, onBrief, brief, onFaded }) {
+    function HealthCard({ health, onAction }) {
+      const [expanded, setExpanded] = React.useState(false)
+      const all = Array.isArray(health.issues) ? health.issues : []
+      const issues = expanded ? all : all.slice(0, 3)
+      const counts = health.counts ?? {}
+      const total = (counts.block ?? 0) + (counts.warn ?? 0) + (counts.info ?? 0)
+      const tone = counts.block ? T.danger : counts.warn ? T.warn : T.ok
+      const label = total
+        ? (counts.block || counts.warn ? `本章体检 · ${total} 项待处理` : `本章体检 · ${total} 条提醒`)
+        : '本章体检 · 通过'
+      return h('div', {
+        className: 'fade-card',
+        style: { marginTop: 10, borderLeft: `3px solid ${tone}`, paddingLeft: 10 },
+      },
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
+        h('span', { style: { width: 7, height: 7, borderRadius: '50%', background: tone, flex: 'none' } }),
+        h('span', { style: { fontSize: 12, fontWeight: 600 } }, label),
+        h('span', { className: 'fade-grow' }),
+        h('span', { className: 'fade-t2' }, `第 ${health.chapter} 章`)),
+      issues.length
+        ? h('div', { style: { marginTop: 2 } }, issues.map((issue) => h('button', {
+          key: issue.id,
+          type: 'button',
+          className: 'fade-row',
+          style: { padding: '7px 0', textAlign: 'left', alignItems: 'flex-start' },
+          onClick: () => onAction?.(issue.action),
+        },
+        h('span', {
+          style: {
+            width: 3, alignSelf: 'stretch', flex: 'none', borderRadius: 2, marginTop: 2,
+            background: issue.severity === 'block' ? T.danger : issue.severity === 'warn' ? T.warn : T.muted,
+          },
+        }),
+        h('div', { className: 'fade-grow' },
+          h('div', { style: { fontSize: 11.5, lineHeight: 1.4, whiteSpace: 'normal' } }, issue.title),
+          h('div', { className: 'fade-t2', style: { whiteSpace: 'normal', marginTop: 2 } }, issue.detail),
+          issue.action?.label
+            ? h('span', { style: { color: T.brand, fontSize: 10, fontFamily: T.mono } }, `${issue.action.label} →`)
+            : null))))
+        : h('div', { className: 'fade-t2', style: { marginTop: 4 } }, '这一章没有发现需要处理的问题。'),
+      health.passed?.length
+        ? h('div', { className: 'fade-t2', style: { marginTop: 6 } },
+          `检查通过 ${health.passed.length} 项：${health.passed.map((item) => item.label).join('、')}`)
+        : null,
+      all.length > 3
+        ? h('button', {
+          type: 'button', className: 'fade-chip', style: { marginTop: 6 },
+          onClick: () => setExpanded((value) => !value),
+        }, expanded ? '收起' : `展开全部 ${all.length} 项`)
+        : null,
+      h('div', { className: 'fade-t2', style: { marginTop: 5, display: 'flex', justifyContent: 'space-between' } },
+        h('span', null, '只读，不自动修改记忆'),
+        h('span', null, health.summary ?? '')))
+    }
+
+    function Overview({ snapshot, mode, onToggleMode, onGo, onBrief, brief, onFaded, onHealthAction }) {
       const overview = snapshot.overview ?? {}
       const savings = overview.savings ?? {}
       const decay = overview.decay ?? {}
@@ -449,6 +504,8 @@ window.__ModuleLoader__.load({
           ? h('div', { className: 'fade-t2', style: { marginTop: 6 } },
             `另有 ${decay.recalled} 条已经要翻旧账；L0 硬契约 ${decay.hardKept} 条永不褪色。`)
           : null,
+
+        snapshot.health ? h(HealthCard, { health: snapshot.health, onAction: onHealthAction }) : null,
 
         h('div', { className: 'fade-sec' }, h('h3', null, '最近人物'), h('span', null, '按出场章')),
         people.length
@@ -859,7 +916,28 @@ window.__ModuleLoader__.load({
     /* ════════════════════════════════════════════════════════════════════════
      * 8. Source
      * ════════════════════════════════════════════════════════════════════════ */
-    function SourceSection({ index, remote, sessionId, inline, fadedChapters }) {
+    function SourceExcerpt({ result }) {
+      const text = result?.text ?? ''
+      if (!text) return h('pre', { className: 'fade-pre' }, '（空）')
+      const offset = Number.isInteger(result.offset) ? result.offset : null
+      const end = Number.isInteger(result.endOffset) ? result.endOffset : null
+      const base = Number.isInteger(result.excerptStart) ? result.excerptStart : 0
+      if (offset == null || end == null) return h('pre', { className: 'fade-pre' }, text)
+      const start = offset - base
+      const stop = end - base
+      if (start < 0 || stop <= start || stop > text.length) return h('pre', { className: 'fade-pre' }, text)
+      return h('pre', { className: 'fade-pre' },
+        text.slice(0, start),
+        h('mark', {
+          style: {
+            background: 'rgba(125,149,251,.28)', color: 'inherit',
+            borderRadius: 2, padding: '0 1px',
+          },
+        }, text.slice(start, stop)),
+        text.slice(stop))
+    }
+
+    function SourceSection({ index, remote, sessionId, inline, fadedChapters, book }) {
       const [term, setTerm] = React.useState(inline?.query ?? '')
       const [result, setResult] = React.useState(null)
       const [busy, setBusy] = React.useState(false)
@@ -878,6 +956,7 @@ window.__ModuleLoader__.load({
         setError(null)
         try {
           const value = unwrap(await remote.sourceSlice(sessionId, {
+            ...(book ? { book } : {}),
             chapter: targetChapter,
             ...(String(targetTerm || '').trim() ? { query: String(targetTerm).trim() } : { from: 0, len: 2000 }),
           }))
@@ -953,11 +1032,15 @@ window.__ModuleLoader__.load({
         result
           ? h('div', { style: { marginTop: 8 } },
             h('div', { className: 'fade-t2' }, result.ok
-              ? `第 ${result.chapter} 章 · 偏移 ${result.offset}${result.truncated ? ' · 已截断' : ''}${result.note ? ` · ${result.note}` : ''}`
+              ? `第 ${result.chapter} 章 · 偏移 ${result.offset}${result.endOffset != null ? `–${result.endOffset}` : ''}${result.truncated ? ' · 已截断' : ''}${result.stale === true ? ' · 原文已变化' : result.stale === false ? ' · sha 校验通过' : ''}${result.note ? ` · ${result.note}` : ''}`
               : '没取到'),
             result.ok
-              ? h('pre', { className: 'fade-pre' }, result.text || '（空）')
-              : h('div', { className: 'fade-err', style: { marginTop: 6 } }, result.message ?? result.code ?? '取不到'))
+              ? h(SourceExcerpt, { result })
+              : h('div', { className: 'fade-err', style: { marginTop: 6 } }, result.message ?? result.code ?? '取不到'),
+            result.ok && result.stale === true
+              ? h('div', { className: 'fade-err', style: { marginTop: 6 } },
+                '原文已变化：旧偏移可能不再准确；建议重新 digest 这一章，或重新 memo_ingest。')
+              : null)
           : null)
     }
 
@@ -1115,6 +1198,18 @@ window.__ModuleLoader__.load({
         setSection('source')
       }
 
+      const healthAction = (action) => {
+        if (!action) return
+        if (action.kind === 'brief') {
+          setSection('overview')
+          return
+        }
+        setSection('cards')
+        setKind('events')
+        if (Number.isInteger(action.chapter) && action.chapter > 0) setChapterFilter(action.chapter)
+        if (action.kind === 'card' && action.cardId) setSelected(action.cardId)
+      }
+
       const clearFilter = () => {
         setQuery('')
         setDebounced('')
@@ -1140,6 +1235,13 @@ window.__ModuleLoader__.load({
             onClick: toggleMode,
             title: '切换 /memo on | off',
           }, mode ? '开' : '关'),
+          snapshot?.revision != null
+            ? h('span', {
+              className: 'fade-chip',
+              style: { height: 18, fontSize: 9.5, color: T.muted },
+              title: '记忆版本',
+            }, `v${snapshot.revision}`)
+            : null,
           h('div', { className: 'fade-grow' }),
           h('button', {
             type: 'button', className: 'fade-chip', onClick: () => { clearFilter(); panel.reload() },
@@ -1177,6 +1279,7 @@ window.__ModuleLoader__.load({
         body = h(Overview, {
           snapshot, mode, onToggleMode: toggleMode, onGo: go, onBrief: generateBrief, brief,
           onFaded: () => { setFadedOnly(true); setKind('events'); setSection('cards') },
+          onHealthAction: healthAction,
         })
       } else if (section === 'cards') {
         body = h(CardsSection, {
@@ -1216,6 +1319,7 @@ window.__ModuleLoader__.load({
         body = h(SourceSection, {
           index: sourceIndex, remote, sessionId, inline: sourceCursor,
           fadedChapters: (snapshot.chapters ?? []).filter((row) => row.faded > 0),
+          book: bookPicked ?? snapshot?.book ?? null,
         })
       }
 
@@ -1228,7 +1332,9 @@ window.__ModuleLoader__.load({
         }, label))),
         h('div', { className: 'fade-body' }, body),
         h('div', { className: 'fade-foot' },
-          h('span', null, snapshot?.generatedAt ? `快照 ${new Date(snapshot.generatedAt).toLocaleTimeString('zh-CN', { hour12: false })}` : '未加载'),
+          h('span', null, snapshot?.revision != null
+            ? `记忆 v${snapshot.revision} · 快照 ${snapshot.generatedAt ? new Date(snapshot.generatedAt).toLocaleTimeString('zh-CN', { hour12: false }) : '未加载'}`
+            : (snapshot?.generatedAt ? `快照 ${new Date(snapshot.generatedAt).toLocaleTimeString('zh-CN', { hour12: false })}` : '未加载')),
           h('span', null, `${(snapshot?.warnings ?? []).length} 条提示`)))
     }
 

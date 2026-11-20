@@ -69,18 +69,24 @@ dsh plugin --profile web add github:DrizzleGig/dsh-novel-fade
 memo_digest(dir, book, chapter, path="正文/第12章.md", cards=[...], sheet={...})
 ```
 
-`quote` / `ending` / `keyLines` 必须**逐字**来自正文，否则拒收——模型不能凭空补细节。同一章重做要传 `replace: true`，旧卡会被标成 superseded。
+`quote` / `ending` / `keyLines` 必须**逐字**来自正文，否则拒收——模型不能凭空补细节。同一章重做要传 `replace: true`，旧卡会被标成 superseded。返回的 `receipt` 是这一章的落账凭据：`revision`（写后版本）、`artifactId`（`digest:ch12:v2`）、`hash`（正文 sha256）、`cardIds`。
 
 ### 5. 看右侧栏
 
-会话头点「长篇记忆」，右栏出现四个分段：
+会话头点「长篇记忆」，右栏出现四个分段（0.7.0 的总览里多了「本章体检」和记忆版本 `vN`）：
 
 | 分段 | 看什么 |
 |---|---|
-| 总览 | 这一章能省多少 token、最近人物与事件、原文贮存状态、生成本章简报 |
-| 卡片 | 事件 / 章节 / 人物 / 地点，搜索、按章筛选、"只看已褪" |
-| 曲线 | 可及性 × 章节，标出 0.55 的"要翻旧账"线 |
-| 原文 | 章节索引 + 按需取片段（≤4000 字） |
+| 总览 | 记忆预算、**本章体检**（缺 digest / L0 无锚句 / 线索到期 / 原文未存）、最近人物与事件、原文贮存状态、生成本章简报 |
+| 卡片 | 事件 / 章节 / 人物 / 地点，搜索、按章筛选、"只看已褪"；卡详情可**回查原句并高亮** |
+| 曲线 | 可及性 × 章节，标出 0.55 的"要翻旧账"线；500 章不再只显示末段 |
+| 原文 | 章节索引 + 按需取片段（≤4000 字），显示偏移与 sha 校验；原文改过会标 stale |
+
+## 0.7.0 的三个新能力
+
+- **写后可核对**：`memo_digest` / `memo_forget` 返回 `receipt`（revision / artifactId / hash）；服务 `novelFade.getStatus` 能回查最近一次 digest 的收据，编排器不再只能信"模型说写完了"。
+- **章末体检**：总览里的「本章体检」把问题分成确定 / 待确认 / 提醒三级，指出哪章缺 digest、哪张 L0 没有逐字锚句、哪条线索过期、哪章原文没存；只读，不自动改记忆。
+- **原文定位**：从卡片的锚句回到原文，返回精确 offset 并高亮；原文与索引的 sha256 对不上时明确标"原文已变化"，不静默跳到相似位置。
 
 ## 它解决什么
 
@@ -100,20 +106,20 @@ memo_digest(dir, book, chapter, path="正文/第12章.md", cards=[...], sheet={.
 
 | 工具 | 用途 |
 |---|---|
-| `memo_digest` | 写完一章后沉淀事件卡 + 场景卡，并默认把本章正文存进原文贮存；没给 cards 只预览 |
-| `memo_brief` | 写下一章前取简报；默认 1400 字，handoff 2200 字；L0 独立成段且不被裁 |
+| `memo_digest` | 写完一章后沉淀事件卡 + 场景卡，并默认把本章正文存进原文贮存；没给 cards 只预览；返回 `receipt`（revision/artifactId/hash） |
+| `memo_brief` | 写下一章前取简报；默认 1400 字，handoff 2200 字；L0 独立成段且不被裁；装了 beat 时 `sources` 给编排器，不进模型上下文 |
 | `memo_recall` | 按人物 / 地点 / 关键词翻记忆；`deep: true` 才读原文并标记"这是原文" |
-| `memo_forget` | 作者主权：软删除 / 恢复，必须写 reason；L0 默认拒删，`force: true` 才删并写审计 |
-| `memo_state` | 全书记忆体检：缺 digest 的章、三维分布、L0 分布、beat 状态、预算估算 |
+| `memo_forget` | 作者主权：软删除 / 恢复，必须写 reason；L0 默认拒删，`force: true` 才删并写审计；返回 `receipt.revision` |
+| `memo_state` | 全书记忆体检：缺 digest 的章、三维分布、L0 分布、beat 状态、预算估算，以及结构化 `health` |
 | `memo_ingest` | 给**旧章**补原文储备（新章由 digest 自动存）；不写卡、不调模型 |
-| `memo_source` | 按需读原文贮存里的一小段（≤4000 字），只有卡答不上来、要核对原句时才用 |
+| `memo_source` | 按需读原文贮存里的一小段（≤4000 字），只有卡答不上来、要核对原句时才用；返回 offset / sha256 / stale |
 
 ## 侧栏四段
 
-- **总览**：左上是记忆预算（原文 token → 记忆 token、少读百分比、累计少读），右上三个迷你统计（人物 / 事件 / 已褪）；下面是最新人物、时间轴事件、原文贮存状态和「生成本章简报」。
-- **卡片**：搜索 + 事件 / 章节 / 人物 / 地点 / 已褪筛选；点卡原地出详情（三维、因→果、锚句、回查原句），点章节行出**章节档案**（场景 / 关键动作 / 关键句 / 结尾 / 未闭合线索）。
-- **曲线**：人物 / 事件 / 章节三条口径，可及性随章衰减，0.55 以下是"细节要翻旧账"区。
-- **原文**：只列索引和每章"有几条卡已褪"，不加载正文；搜索或点章才取片段。
+- **总览**：左上是记忆预算（原文 token → 记忆 token、少读百分比、累计少读），右上三个迷你统计（人物 / 事件 / 已褪）；下面是**本章体检**、最新人物、时间轴事件、原文贮存状态和「生成本章简报」；头部显示记忆版本 `vN`。
+- **卡片**：搜索 + 事件 / 章节 / 人物 / 地点 / 已褪筛选；点卡原地出详情（三维、因→果、锚句、回查原句），点章节行出**章节档案**（场景 / 关键动作 / 关键句 / 结尾 / 未闭合线索）；回查原句会定位并高亮，原文改过会标 stale。
+- **曲线**：人物 / 事件 / 章节三条口径，可及性随章衰减，0.55 以下是"细节要翻旧账"区；500 章也保留全段采样。
+- **原文**：只列索引和每章"有几条卡已褪"，不加载正文；搜索或点章才取片段，并显示偏移与 sha 校验状态。
 
 ## 原文贮存：只存不用
 
@@ -148,15 +154,15 @@ memo_digest(dir, book, chapter, path="正文/第12章.md", cards=[...], sheet={.
 | 插件列表名 | 褪色 |
 | 面板名 | 长篇记忆 |
 | 包名 | `dsh-novel-fade` |
-| 版本 | v0.6.0 |
+| 版本 | v0.7.0 |
 | 运行环境 | Node.js ≥ 20 |
 | 外部依赖 | 零依赖（右栏只用 DSH 官方 `sidebarRight*`，不依赖第三方侧栏插件） |
 | 工具 | 七个 `memo_*` |
-| 右栏 RPC | `panel` / `curve` / `chapter` / `sourceIndex` / `sourceSlice` / `brief` / `status` / `setMode`（全部按 `sessionId` 寻址） |
+| 右栏 RPC | `panel` / `curve` / `chapter` / `sourceIndex` / `sourceSlice` / `brief` / `status` / `setMode`（全部按 `sessionId` 寻址；`sourceSlice` 返回 offset/sha/stale） |
 | 数据目录 | `<工作区>/.dsh-novel-fade/<book>/`（书库索引在 `<DSH_HOME>/dsh-novel-fade/library.json`） |
 | 记忆分层 | L0 硬契约 / L1 事件 / L2 近期上下文 / L3 归档 |
 | 衰减 | `accessibility` 随章衰减；0.55 是 precise 的分界；L0 不衰减 |
-| 测试 | `npm test` 51/51 |
+| 测试 | `npm test` 100/100 |
 | 默认状态 | 关闭（`/memo on` 启用） |
 | 许可 | MIT |
 
@@ -196,6 +202,8 @@ memo_digest(dir, book, chapter, path="正文/第12章.md", cards=[...], sheet={.
 
 ## 更多文档
 
+- [契约与能力声明（v0.7.0）](https://github.com/DrizzleGig/dsh-novel-fade/blob/main/docs/contract.md)
+- [CHANGELOG](https://github.com/DrizzleGig/dsh-novel-fade/blob/main/CHANGELOG.md)
 - [设计与开发方案（v0.6 侧栏重制）](https://github.com/DrizzleGig/dsh-novel-fade/blob/main/docs/dsh-novel-fade-v0.6-侧栏重制-设计与开发方案.md)
 - [侧栏证据（槽位实测）](https://github.com/DrizzleGig/dsh-novel-fade/blob/main/docs/evidence/2026-11-16-侧栏证据.md)
 - [效果图（设计稿）](https://github.com/DrizzleGig/dsh-novel-fade/blob/main/docs/mockups/panel-v06.png)

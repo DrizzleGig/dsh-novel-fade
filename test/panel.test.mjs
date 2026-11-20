@@ -1,4 +1,4 @@
-﻿import test from 'node:test'
+import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -53,6 +53,11 @@ test('panel v2: snapshot is read-only, one screen, bounded and hides faded conte
 
     const snapshot = await readPanelSnapshot(dir, BOOK, { chapter: 21, filters: { limit: 200 } })
     assert.equal(snapshot.snapshotVersion, 2)
+    assert.equal(snapshot.revision, 1)
+    assert.equal(snapshot.revisionDrift, false)
+    assert.equal(new Date(snapshot.updatedAt).toISOString(), snapshot.updatedAt)
+    assert.equal(snapshot.health.ok, true)
+    assert.ok(Array.isArray(snapshot.health.issues))
     assert.equal(snapshot.exists, true)
     assert.equal(snapshot.book, BOOK)
     assert.equal(snapshot.chapter, 21)
@@ -241,6 +246,8 @@ test('panel v2: tool surface can recall/state/ingest on the fixture book', async
     const state = await tools.get('memo_state').execute({ dir, book: BOOK, chapter: 21 })
     assert.equal(state.exists, true)
     assert.equal(state.chapters, 20)
+    assert.equal(state.health.ok, true)
+    assert.ok(Array.isArray(state.health.issues))
     assert.ok(state.warnings.some((line) => /未接 beat/.test(line)))
 
     const forget = await tools.get('memo_forget').execute({
@@ -313,4 +320,49 @@ test('panel v2: tool surface can recall/state/ingest on the fixture book', async
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+})
+
+test('curve: a 500-chapter book keeps points across the whole range', () => {
+  const memory = { cards: [], chapters: {}, entities: {}, places: {}, meta: { revision: 1 } }
+  for (let chapter = 1; chapter <= 500; chapter += 1) {
+    for (let index = 0; index < 3; index += 1) {
+      memory.cards.push({
+        id: `c${chapter}-${index}`,
+        chapter,
+        digestVersion: 1,
+        topic: '普通事件',
+        gist: '',
+        emotion: '',
+        emotionIntensity: 0,
+        salience: 3,
+        domain: 'normal',
+        layer: 'L2',
+        contract: { kind: 'none', protected: false, status: 'active', resolution: 'open' },
+        temporal: { occurred_at: chapter, last_referenced_at: chapter, last_reinforced_at: chapter },
+        importance: { continuity: 'medium', consequence: 'medium', uniqueness: 'medium', recurrence: 'medium' },
+        factStatus: 'confirmed',
+        lifecycle: { status: 'active', protection: 'none', activation: 'hot', resolution: 'open' },
+        entityIds: [],
+        placeId: '',
+        quote: '',
+        mentions: 0,
+        source: 'model',
+        cause: '',
+        effect: '',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        lastRecalledChapter: null,
+        superseded: false,
+        supersededBy: null,
+        familiarity: 0.5,
+        accessibility: 0.8,
+        fidelity: 0.6,
+      })
+    }
+  }
+  const curve = buildCurve(memory, { series: 'cards', chapter: 500 })
+  assert.equal(curve.x.to, 500)
+  assert.equal(curve.lines[0].points.length, 24)
+  assert.equal(curve.lines[0].points[0][0], 1)
+  assert.equal(curve.lines[0].points.at(-1)[0], 500)
+  assert.ok(curve.lines[0].points.every(([, value]) => value !== null))
 })

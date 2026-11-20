@@ -1,4 +1,4 @@
-﻿import test from 'node:test'
+import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -447,11 +447,11 @@ test('beat adapter: 未知 schemaVersion 仍然拒接，不会瞎读', async () 
   }
 })
 
-test('tools: seven names; digest->brief->state through the real tool surface', async () => {
+test('tools: eight names; digest->brief->state through the real tool surface', async () => {
   const dir = await tempDir()
   try {
     const defs = Object.fromEntries(toolDefinitions().map((def) => [def.name, def]))
-    assert.deepEqual(Object.keys(defs).sort(), ['memo_brief', 'memo_digest', 'memo_forget', 'memo_ingest', 'memo_recall', 'memo_source', 'memo_state'])
+    assert.deepEqual(Object.keys(defs).sort(), ['memo_brief', 'memo_digest', 'memo_forget', 'memo_ingest', 'memo_pin', 'memo_recall', 'memo_source', 'memo_state'])
 
     const preview = await defs.memo_digest.execute({ dir, book: BOOK, chapter: 1, text: TEXT })
     assert.equal(preview.stage, 'extract')
@@ -528,7 +528,7 @@ test('index: /memo on registers the session mode and lifts the tool restriction'
       on() { return () => {} },
     }
     await apply(ctx)
-    assert.equal(tools.size, 7)
+    assert.equal(tools.size, 8)
     assert.equal(restrictions, 1)
     assert.equal(activeRestrictions, 1)
 

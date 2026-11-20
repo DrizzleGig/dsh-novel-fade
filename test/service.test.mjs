@@ -13,7 +13,7 @@ import { createFadeService } from '../lib/service.js'
 import { bookFilePath, getSessionMode, mutateMemory, readMemory } from '../lib/store.js'
 
 const BOOK = '雨夜服务测试'
-const VERSION = '0.7.0'
+const VERSION = '0.7.1'
 const SCENE = { location: '枯井', entities: ['林川'], props: ['钥匙'] }
 const TEXT = '林川走到枯井边，把钥匙放在石沿上。雨落在油纸伞上。他转身走进雨里。'
 
@@ -67,7 +67,7 @@ function assertIso(value) {
 test('service identity: exact capabilities, directory, version and read-only contract', () => {
   assert.deepEqual(service().identity(), {
     plugin: 'dsh-novel-fade', version: VERSION, service_version: 1,
-    capabilities: ['fade.brief', 'fade.status', 'fade.revision'],
+    capabilities: ['fade.brief', 'fade.status', 'fade.revision', 'fade.artifact', 'fade.companions'],
     dir: '.dsh-novel-fade', readOnly: true,
   })
   assert.equal(createFadeService({ version: 'test-version' }).identity().version, 'test-version')
@@ -100,7 +100,7 @@ test('revision: first successful write persists one despite multiple audit entri
   assert.equal(memory.meta.revision, 1)
   assert.equal(JSON.parse(await readFile(bookFilePath(cwd, BOOK), 'utf8')).meta.revision, 1)
   assert.deepEqual(await service().getRevision({ cwd, book: BOOK }), {
-    revision: 1, updatedAt: memory.meta.updatedAt,
+    revision: 1, revisionDrift: false, updatedAt: memory.meta.updatedAt,
   })
 })
 
@@ -217,7 +217,7 @@ test('getStatus: counts active cards and uses the latest digest by time', async 
   memory.meta.revision = 8
   await writeMemory(cwd, memory)
   assert.deepEqual(await service().getStatus({ cwd, book: BOOK }), {
-    book: BOOK, chapters: 3, cards: 1,
+    book: BOOK, chapters: 3, cards: 1, pinned: 0,
     lastDigest: '2026-11-20T03:00:00.000Z',
     lastDigestChapter: 2,
     lastDigestReceipt: null,
@@ -230,7 +230,7 @@ test('getStatus: an empty book has zero counts and no digest time', async (t) =>
   const memory = emptyMemory({ book: BOOK })
   await writeMemory(cwd, memory)
   assert.deepEqual(await service().getStatus({ cwd, book: BOOK }), {
-    book: BOOK, chapters: 0, cards: 0, lastDigest: null,
+    book: BOOK, chapters: 0, cards: 0, pinned: 0, lastDigest: null,
     lastDigestChapter: null, lastDigestReceipt: null,
     updatedAt: memory.meta.updatedAt, revision: 0, revisionDrift: false,
   })
@@ -241,7 +241,7 @@ test('getBrief: preserves buildBrief output and adds revision, timestamp and wor
   const { memory } = await seed(cwd)
   const started = Date.now()
   const brief = await service().getBrief({ cwd, book: BOOK, chapter: 2, scene: SCENE })
-  const { revision, generated_at, dir, book, ...built } = brief
+  const { revision, revisionDrift, generated_at, dir, book, ...built } = brief
   assert.deepEqual(built, buildBrief({ memory, beat: { status: 'absent' }, chapter: 2, scene: SCENE }))
   assert.equal(revision, 1)
   assertIso(generated_at)
@@ -387,7 +387,7 @@ test('index: provides novelFade within an effect and keeps reads available acros
   const api = services.get('novelFade')
   assert.ok(api)
   assert.equal(api.identity().version, VERSION)
-  assert.equal(tools.size, 7)
+  assert.equal(tools.size, 8)
   assert.equal(restrictions, 1)
   assert.equal(tools.get('memo_brief').when({ agent }), false)
   assert.equal((await api.getBrief({ cwd, book: BOOK, chapter: 2 })).revision, 1)
@@ -401,4 +401,29 @@ test('index: provides novelFade within an effect and keeps reads available acros
   assert.equal(restrictions, 1)
   assert.equal((await api.getBrief({ cwd, book: BOOK, chapter: 2 })).revision, 1)
   assert.equal((await api.getStatus({ cwd, book: BOOK })).chapters, 1)
+})
+
+
+
+test('getCompanions: without a host context every sibling is unavailable, never installed', async (t) => {
+  const cwd = await workspace(t)
+  await seed(cwd)
+  const result = await service().getCompanions({ cwd, book: BOOK })
+  assert.equal(result.book, BOOK)
+  for (const name of ['beat', 'voice', 'fanfic', 'conductor']) {
+    assert.equal(result[name].state, 'unavailable')
+    assert.equal(result[name].installed, undefined)
+  }
+})
+
+test('getBrief: carries revisionDrift and the server-side budget limit', async (t) => {
+  const cwd = await workspace(t)
+  await seed(cwd)
+  const brief = await service().getBrief({ cwd, book: BOOK, chapter: 2, budget: 2200, mode: 'chapter' })
+  assert.equal(brief.revisionDrift, false)
+  assert.equal(brief.budgetLimit, 1800)
+  assert.equal(brief.budget, 1800)
+  const handoff = await service().getBrief({ cwd, book: BOOK, chapter: 2, budget: 2200, mode: 'handoff' })
+  assert.equal(handoff.budgetLimit, 2600)
+  assert.equal(handoff.budget, 2200)
 })

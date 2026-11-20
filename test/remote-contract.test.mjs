@@ -7,12 +7,12 @@ import { DESCRIPTORS, TYPERT_REMOTE } from '../lib/remote-contract.js'
 const clientSource = readFileSync(new URL('../client.js', import.meta.url), 'utf8')
 const byMethod = new Map(DESCRIPTORS.map((descriptor) => [descriptor.method, descriptor]))
 
-const READ_METHODS = ['panel', 'curve', 'chapter', 'sourceIndex', 'sourceSlice', 'brief']
+const READ_METHODS = ['panel', 'curve', 'chapter', 'sourceIndex', 'sourceSlice', 'brief', 'timeline', 'character', 'artifact']
 
-test('remote-contract: eight methods share the memoMode service', () => {
+test('remote-contract: eleven methods share the memoMode service', () => {
   assert.equal(TYPERT_REMOTE.package, 'dsh-novel-fade')
-  assert.equal(DESCRIPTORS.length, 8)
-  assert.deepEqual([...byMethod.keys()].sort(), ['brief', 'chapter', 'curve', 'panel', 'setMode', 'sourceIndex', 'sourceSlice', 'status'])
+  assert.equal(DESCRIPTORS.length, 11)
+  assert.deepEqual([...byMethod.keys()].sort(), ['artifact', 'brief', 'chapter', 'character', 'curve', 'panel', 'setMode', 'sourceIndex', 'sourceSlice', 'status', 'timeline'])
   for (const descriptor of DESCRIPTORS) {
     assert.equal(descriptor.service, 'memoMode')
     assert.equal(descriptor.namespace, 'memoMode')
@@ -30,6 +30,9 @@ test('remote-contract: every v0.6 read method is session-addressed', () => {
   assert.deepEqual(byMethod.get('sourceIndex').parameters.map((item) => item.name), ['sessionId', 'options'])
   assert.deepEqual(byMethod.get('sourceSlice').parameters.map((item) => item.name), ['sessionId', 'options'])
   assert.deepEqual(byMethod.get('brief').parameters.map((item) => item.name), ['sessionId', 'options'])
+  assert.deepEqual(byMethod.get('timeline').parameters.map((item) => item.name), ['sessionId', 'options'])
+  assert.deepEqual(byMethod.get('character').parameters.map((item) => item.name), ['sessionId', 'options'])
+  assert.deepEqual(byMethod.get('artifact').parameters.map((item) => item.name), ['sessionId', 'options'])
   // The old workspace-addressed surface is gone for good.
   for (const method of ['workspaces', 'books', 'snapshot', 'briefPreview']) {
     assert.equal(byMethod.has(method), false, `${method} must not come back`)
@@ -55,7 +58,7 @@ test('remote-contract: codecs reject malformed input before the Host sees it', (
   assert.doesNotThrow(() => mode.parameters[1].codec.create().parse(true))
   assert.throws(() => mode.parameters[1].codec.create().parse('true'), /boolean/)
 
-  for (const method of ['panel', 'curve', 'sourceSlice', 'brief']) {
+  for (const method of ['panel', 'curve', 'sourceSlice', 'brief', 'timeline', 'character', 'artifact']) {
     const codec = byMethod.get(method).parameters[1].codec.create()
     assert.doesNotThrow(() => codec.parse({ chapter: 3, series: 'people' }))
     assert.throws(() => codec.parse(null), /JSON object/)

@@ -14,13 +14,13 @@ test('client contract: overview renders the health card and the revision chip', 
 test('client contract: health actions can navigate to cards with a chapter filter', () => {
   assert.match(source, /const healthAction = \(action\) =>/)
   assert.match(source, /setChapterFilter\(action\.chapter\)/)
-  assert.match(source, /setSelected\(action\.cardId\)/)
+  assert.match(source, /setSheet\(\{ type: 'card', card \}\)/)
 })
 
 test('client contract: source requests carry the selected book and render a located excerpt', () => {
-  assert.match(source, /function SourceSection\(\{[^}]*book[^}]*\}\)/)
-  assert.match(source, /\.\.\.\(book \? \{ book \} : \{\}\)/)
-  assert.match(source, /function SourceExcerpt\(/)
+  assert.match(source, /function SourceSheet\(\{ remote, sessionId, book, chapter, query, onClose \}\)/)
+  assert.match(source, /function SourceResult\(\{ result \}\)/)
   assert.match(source, /result\.stale === true/)
-  assert.match(source, /book: bookPicked \?\? snapshot\?\.book \?\? null/)
+  assert.match(source, /book, chapter, query: String\(query \?\? ''\)\.trim\(\)/)
+  assert.match(source, /const \[bookPicked, setBookPicked\] = React\.useState\(null\)/)
 })

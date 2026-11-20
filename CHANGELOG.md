@@ -1,4 +1,36 @@
-# Changelog
+﻿# Changelog
+
+## 0.7.1 — 2026-11-21 · 可追溯的协作与三入口工作台
+
+### 新增
+
+- **任意产物回查**：新增 `lib/artifact.js` 与 `novelFade.getArtifact({cwd, book, artifactId, verify})`，覆盖 digest / forget / restore / pin；返回 `revision` / `hash` / `cardIds` / `exists` / `legacy` / `integrity`；`verify:true` 重新计算原文 sha，区分 `verified / stale / unavailable`。重做时保留上一版 artifact facts（`artifactHistory`），多版回查不再串成最新版。
+- **收据持久化**：forget / restore 的完整 `receipt` 写进 `audit[]`；digest audit 带 `artifactId`。旧账仍返回 `legacy:true, hash:null`，不伪造。
+- **pin / unpin**：第 8 个工具 `memo_pin`，只设 `pinned / pinnedAt / pinnedReason`；不改内容/分层/来源；pin ≠ L0；重复调用 no-op；`memo_forget` 默认拒删 pinned，`force:true` 才覆盖并写审计。
+- **协作状态**：新增 `lib/companions.js` 与 `novelFade.getCompanions`，只报 `available / adapted / unavailable / unknown`，不把服务存在当安装/启用；右栏总览底部有状态条，sheet 里显示版本/capability/原因。
+- **简报工作台**：`getBrief` 增加 `budgetLimit` / `breakdown` / 实际进入的 `sources` / `revisionDrift`；右栏 sheet 可调章号、模式、预算（300–2600）、在场人物、地点/道具，逐段看裁剪，复制/导出。
+- **三入口 UI**：总览 / 记忆 / 溯源；人物/卡片搜索、pin 筛选、时间线、原文、按 artifactId 回查；深/浅色；420px 为主，360–720 响应式。
+- **契约**：新增 `docs/adapter-contract.md`；`docs/contract.md` 升级 0.7.1。
+
+### 修复
+
+- 简报 `sources` 只统计实际进入正文的卡；段内裁剪不再多报，也不借用其他段里的同名卡。
+- 时间线补齐真实 `action:'unpin'` 审计；取消钉住不再漏掉。
+- 普通模式预算严格夹到 1800；`2200` 只在 handoff 模式可选，UI 显示 `budgetLimit`。
+- 服务层拒绝相对 `cwd`；工具层的 `正文/` 自动上移仍保留。
+- `getBrief` 透传 `revisionDrift`。
+
+### 兼容
+
+- `memory.json` 仍为 `schemaVersion: 3`；新增字段全部可选。
+- 7 个旧工具语义不变；`memo_pin` 为第 8 个。
+- 旧账本缺 receipt 时回查 `legacy:true`，不阻断。
+- 不 import 兄弟插件；缺席时全部功能可用。
+
+### 测试
+
+- `npm test`：100 → 149；新增 artifact / pin / companions / timeline / characters / path / brief 预算与 breakdown / 面板 pinned 等。
+- `npm run check` 全过。
 
 ## 0.7.0 — 2026-11-20 · 可核对的记忆
 

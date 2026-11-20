@@ -6,7 +6,6 @@ window.__ModuleLoader__.load({
 
     /* ════════════════════════════════════════════════════════════════════════
      * 0. Remote contract — keep in sync with lib/remote-contract.js.
-     *    Duplicated because this browser factory cannot import a Host module.
      * ════════════════════════════════════════════════════════════════════════ */
     function scalar(validate) {
       return {
@@ -52,6 +51,9 @@ window.__ModuleLoader__.load({
         ['sourceIndex', [param('sessionId', sessionIdSchema), param('options', jsonObjectSchema)], panelResultSchema, 'FadePanel'],
         ['sourceSlice', [param('sessionId', sessionIdSchema), param('options', jsonObjectSchema)], panelResultSchema, 'FadePanel'],
         ['brief', [param('sessionId', sessionIdSchema), param('options', jsonObjectSchema)], panelResultSchema, 'FadePanel'],
+        ['timeline', [param('sessionId', sessionIdSchema), param('options', jsonObjectSchema)], panelResultSchema, 'FadePanel'],
+        ['character', [param('sessionId', sessionIdSchema), param('options', jsonObjectSchema)], panelResultSchema, 'FadePanel'],
+        ['artifact', [param('sessionId', sessionIdSchema), param('options', jsonObjectSchema)], panelResultSchema, 'FadePanel'],
       ].map(([method, parameters, result, typeSymbol]) => ({
         id: `dsh-novel-fade#memoMode/${method}`,
         namespace: 'memoMode',
@@ -70,7 +72,6 @@ window.__ModuleLoader__.load({
     const fmt = (value) => {
       const number = Number(value)
       if (!Number.isFinite(number)) return '—'
-      if (Math.abs(number) >= 100000) return `${(number / 10000).toFixed(1)}w`
       if (Math.abs(number) >= 10000) return `${(number / 1000).toFixed(1)}k`
       return String(Math.round(number))
     }
@@ -90,52 +91,63 @@ window.__ModuleLoader__.load({
       if (!value) return null
       return value.id ?? value.sessionId ?? String(value)
     }
+    const shortHash = (value) => {
+      const text = String(value ?? '').replace(/^sha256:/, '')
+      return text.length > 12 ? `${text.slice(0, 6)}…${text.slice(-4)}` : text || '—'
+    }
+    const clock = (value) => {
+      if (!value) return '—'
+      const date = new Date(value)
+      if (Number.isNaN(date.getTime())) return '—'
+      return date.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' })
+    }
+    const dayLabel = (value) => {
+      if (!value) return '—'
+      const date = new Date(value)
+      if (Number.isNaN(date.getTime())) return '—'
+      const now = new Date()
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+      const then = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+      const diff = Math.round((start - then) / 86400000)
+      if (diff === 0) return '今天'
+      if (diff === 1) return '昨天'
+      return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    }
+    const parseNames = (value) => String(value ?? '')
+      .split(/[、,，\s]+/)
+      .map((name) => name.trim())
+      .filter(Boolean)
 
     /* ════════════════════════════════════════════════════════════════════════
-     * 1b. Palette — fade 自己的调色板，深/浅两套，仍以宿主 token 兜底。
-     *     每项都是 var(--fade-x, <宿主 token>)，宿主换了主题也不会崩。
+     * 2. Palette + CSS
      * ════════════════════════════════════════════════════════════════════════ */
-    const T = {
-      text: 'var(--fade-text, var(--dsw-alias-label-primary, #1f2328))',
-      muted: 'var(--fade-muted, var(--dsw-alias-label-secondary, #6b7280))',
-      faint: 'var(--fade-faint, var(--dsw-alias-label-secondary, #9aa0a6))',
-      layer1: 'var(--fade-surface, var(--dsw-alias-bg-layer-1, #f7f7f8))',
-      layer2: 'var(--fade-surface-2, var(--dsw-alias-bg-layer-2, #efeff1))',
-      border: 'var(--fade-line, var(--dsw-alias-border-l1, rgba(127,127,127,.22)))',
-      border2: 'var(--fade-line-2, var(--dsw-alias-border-l2, rgba(127,127,127,.38)))',
-      brand: 'var(--fade-brand, var(--dsw-alias-brand-primary, #2563eb))',
-      ok: 'var(--fade-ok, var(--dsw-alias-state-success-primary, #16a34a))',
-      warn: 'var(--fade-warn, var(--dsw-alias-state-warn-primary, #b45309))',
-      danger: 'var(--fade-danger, var(--dsw-alias-state-error-primary, #dc2626))',
-      idle: 'var(--fade-faint, var(--dsw-alias-state-idle-primary, #9ca3af))',
-      c3: 'var(--fade-c3, #8b5cf6)',
-      c4: 'var(--fade-c4, #0ea5e9)',
-      mono: 'ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, monospace',
-    }
-
-    const PERMISSION_TONE = { precise: T.ok, recall: T.warn, gist: T.warn, feeling: T.danger }
-    const PERMISSION_TEXT = { precise: '可写细节', recall: '在库里', gist: '只写大意', feeling: '只写感觉' }
-
     const PALETTE_CSS = `
 .fade-root[data-scheme="dark"]{
-  --fade-text:#e8e9ec; --fade-muted:#9aa0a6; --fade-faint:#6f757c;
-  --fade-surface:rgba(255,255,255,.035); --fade-surface-2:rgba(255,255,255,.07);
-  --fade-line:rgba(255,255,255,.10); --fade-line-2:rgba(255,255,255,.18);
-  --fade-brand:#7d95fb; --fade-ok:#5fae8b; --fade-warn:#d4b04a; --fade-danger:#d97b76;
-  --fade-c3:#a78bfa; --fade-c4:#38bdf8;
-  --fade-shadow:0 1px 0 rgba(255,255,255,.03) inset;
+  --fade-text:#e8edf5; --fade-muted:#98a6b8; --fade-faint:#6f7d90;
+  --fade-bg:#111722; --fade-surface:#18212d; --fade-surface-2:#1f2b3a;
+  --fade-line:rgba(255,255,255,.08); --fade-line-2:rgba(255,255,255,.15);
+  --fade-brand:#7db5f2; --fade-brand-soft:rgba(125,181,242,.12);
+  --fade-ok:#63c7a3; --fade-warn:#e6b95c; --fade-danger:#f07f76;
+  --fade-mono:"Cascadia Mono","SFMono-Regular",Consolas,monospace;
+  --fade-shadow:0 1px 0 rgba(255,255,255,.035) inset,0 18px 50px rgba(0,0,0,.45);
 }
 .fade-root[data-scheme="light"]{
-  --fade-text:#1f2328; --fade-muted:#5b6168; --fade-faint:#8a9098;
-  --fade-surface:#fbfbfc; --fade-surface-2:#f1f2f5;
-  --fade-line:#e4e6ea; --fade-line-2:#d2d6dd;
-  --fade-brand:#3f5ce0; --fade-ok:#23805c; --fade-warn:#9a6b12; --fade-danger:#b8443c;
-  --fade-c3:#6d4bd8; --fade-c4:#0b7fb5;
+  --fade-text:#202a36; --fade-muted:#758194; --fade-faint:#7b8695;
+  --fade-bg:#f5f6f8; --fade-surface:#ffffff; --fade-surface-2:#f3f5f8;
+  --fade-line:rgba(32,42,54,.09); --fade-line-2:rgba(32,42,54,.16);
+  --fade-brand:#286fb7; --fade-brand-soft:rgba(40,111,183,.08);
+  --fade-ok:#1f7a5a; --fade-warn:#8f6410; --fade-danger:#b8443c;
+  --fade-mono:"Cascadia Mono","SFMono-Regular",Consolas,monospace;
   --fade-shadow:0 1px 2px rgba(16,24,40,.04);
-}`
+}
+.fade-root[data-scheme="light"] .fade-tag.danger{color:#9d352e;background:rgba(184,68,60,.09);border-color:rgba(184,68,60,.24)}
+.fade-root[data-scheme="light"] .fade-tag.warn{color:#7d570d;background:rgba(143,100,16,.09);border-color:rgba(143,100,16,.24)}
+.fade-root[data-scheme="light"] .fade-tag.ok{color:#176b4e;background:rgba(31,122,90,.09);border-color:rgba(31,122,90,.24)}
+.fade-root[data-scheme="light"] .fade-pin{color:#7d570d}
+.fade-root[data-scheme="light"] .fade-layer{color:#6b7685}
+.fade-root[data-scheme="light"] .fade-cta{background:var(--fade-brand);border-color:var(--fade-brand);color:#fff}`
 
     function detectScheme() {
-      // Test seam: the harness sets window.__FADE_SCHEME__ to render both palettes.
       try {
         const forced = window?.__FADE_SCHEME__
         if (forced === 'light' || forced === 'dark') return forced
@@ -157,83 +169,225 @@ window.__ModuleLoader__.load({
     }
 
     const CSS = `
-.fade-root{display:flex;flex-direction:column;height:100%;min-height:0;color:${T.text};font-size:12.5px;line-height:1.5;background:transparent}
+.fade-root{display:flex;flex-direction:column;height:100%;min-height:0;color:var(--fade-text);background:var(--fade-bg);font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC","Segoe UI",system-ui,sans-serif;font-size:13px;line-height:1.55;position:relative;overflow:hidden}
 .fade-root *{box-sizing:border-box}
-.fade-head{padding:10px 12px 0;flex:none}
-.fade-select{max-width:190px;height:20px;border:1px solid ${T.border};border-radius:5px;background:transparent;color:${T.text};font:inherit;font-size:10.5px;padding:0 2px;cursor:pointer;outline:none}
-.fade-select option{background:var(--dsw-alias-bg-overlay,#1c1e22);color:${T.text}}
-.fade-title-row{display:flex;align-items:center;gap:8px}
-.fade-title{font-size:13px;font-weight:600;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fade-sub{margin-top:2px;color:${T.muted};font-size:10.5px;display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden}
-.fade-tabs{display:flex;gap:2px;padding:8px 10px;border-bottom:1px solid ${T.border};flex:none}
-.fade-tab{flex:1;height:26px;border:0;background:transparent;color:${T.muted};font:inherit;font-size:11.5px;border-radius:6px;cursor:pointer}
-.fade-tab:hover{background:${T.layer1};color:${T.text}}
-.fade-tab[data-a="1"]{background:${T.layer2};color:${T.text};box-shadow:inset 0 0 0 1px ${T.border},inset 0 -2px 0 ${T.brand}}
-.fade-body{flex:1;min-height:0;overflow:auto;padding:10px 12px 16px}
-.fade-foot{flex:none;display:flex;justify-content:space-between;gap:8px;padding:6px 12px;border-top:1px solid ${T.border};color:${T.muted};font-size:9.5px;font-family:${T.mono}}
-.fade-card{border:1px solid ${T.border};border-radius:10px;background:${T.layer1};padding:9px 10px;box-shadow:var(--fade-shadow,none)}
-.fade-num{font-family:${T.mono};font-variant-numeric:tabular-nums}
-.fade-k{font-size:9.5px;letter-spacing:.06em;color:${T.muted};text-transform:uppercase}
-.fade-big{font-family:${T.mono};font-size:20px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
-.fade-big small{font-size:10px;font-weight:400;color:${T.muted};margin-left:2px}
-.fade-top{display:grid;grid-template-columns:minmax(0,1fr) 104px;gap:8px;align-items:stretch}
-.fade-top-side{display:flex;flex-direction:column;gap:6px;min-width:0}
-.fade-mini{border:1px solid ${T.border};border-radius:8px;padding:5px 8px;background:${T.layer1};text-align:left;cursor:pointer;font:inherit;color:inherit;box-shadow:var(--fade-shadow,none);flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center}
-.fade-mini:hover{background:${T.layer2}}
-.fade-mini-num{font-family:${T.mono};font-size:15px;font-weight:600;margin-top:0;line-height:1.2}
-.fade-callout{display:flex;gap:8px;align-items:center;width:100%;text-align:left;font:inherit;color:${T.warn};margin-top:8px;padding:7px 9px 7px 8px;border:0;border-left:3px solid ${T.warn};border-radius:0 7px 7px 0;background:color-mix(in srgb,${T.warn} 7%,transparent);cursor:pointer}
-.fade-callout:hover{background:color-mix(in srgb,${T.warn} 11%,transparent)}
-.fade-callout-t{font-size:11.5px;line-height:1.4}
-.fade-callout-s{font-size:10px;line-height:1.4;color:color-mix(in srgb,${T.warn} 78%,${T.muted})}
-.fade-tl{display:flex;flex-direction:column;margin-top:2px}
-.fade-tl-row{display:flex;gap:8px;padding:5px 0;border:0;background:transparent;font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%}
-.fade-tl-row:hover .fade-tl-body{background:${T.layer1};border-radius:6px}
-.fade-tl-rail{width:10px;flex:none;display:flex;flex-direction:column;align-items:center;padding-top:5px}
-.fade-tl-dot{width:7px;height:7px;border-radius:50%;flex:none}
-.fade-tl-line{width:1px;flex:1;background:${T.border};margin-top:3px}
-.fade-tl-body{flex:1;min-width:0;padding:0 6px 2px 2px}
-.fade-tl-ch{font-family:${T.mono};font-size:9.5px;color:${T.muted};margin-right:5px}
-.fade-info{display:flex;align-items:center;gap:8px;width:100%;padding:7px 2px;border:0;border-top:1px solid ${T.border};background:transparent;font:inherit;color:inherit;text-align:left;cursor:pointer}
-.fade-info:hover{color:${T.text}}
-.fade-stickybar{position:sticky;bottom:-2px;margin-top:10px;padding:8px 0 2px;background:var(--dsw-alias-bg-base,transparent);z-index:2}
-.fade-primary{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:32px;margin-top:0;border-radius:8px;border:1px solid ${T.brand};background:color-mix(in srgb,${T.brand} 14%,transparent);color:${T.brand};font:inherit;font-size:12px;font-weight:600;cursor:pointer}
-.fade-primary:hover{background:color-mix(in srgb,${T.brand} 22%,transparent)}
-.fade-primary:disabled{opacity:.55;cursor:default}
-.fade-row{display:flex;align-items:center;gap:8px;padding:6px 7px;border-radius:7px;cursor:pointer;width:100%;border:0;background:transparent;text-align:left;color:inherit;font:inherit}
-.fade-row:hover{background:${T.layer1}}
-.fade-row[data-a="1"]{background:${T.layer1};box-shadow:inset 0 0 0 1px ${T.border2}}
-.fade-av{width:22px;height:22px;flex:none;border-radius:6px;display:flex;align-items:center;justify-content:center;background:${T.layer2};color:${T.muted};font:600 10px ${T.mono};box-shadow:inset 0 0 0 1px ${T.border}}
-.fade-t1{font-size:12px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.fade-t2{font-size:10px;color:${T.muted};line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:${T.mono}}
+.fade-root button{font-family:inherit}
+.fade-head{flex:none;padding:13px 14px 0;position:relative;z-index:1}
+.fade-title-row{display:flex;align-items:center;gap:8px;min-height:28px}
+.fade-brand{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;flex:none;background:linear-gradient(145deg,#4f83c8,#7db5f2);box-shadow:0 3px 12px rgba(79,131,200,.28)}
+.fade-title{font-size:15px;font-weight:650;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fade-switch{width:36px;height:20px;border-radius:99px;border:0;position:relative;cursor:pointer;flex:none;background:color-mix(in srgb,var(--fade-ok) 24%,transparent);transition:background .15s ease}
+.fade-switch::after{content:"";position:absolute;width:16px;height:16px;border-radius:50%;right:2px;top:2px;background:var(--fade-ok);box-shadow:0 0 0 2px color-mix(in srgb,var(--fade-ok) 12%,transparent);transition:transform .15s ease}
+.fade-switch[data-on="0"]{background:var(--fade-line-2)}
+.fade-switch[data-on="0"]::after{right:auto;left:2px;background:var(--fade-faint);box-shadow:none}
+.fade-switch-label{font-size:10px;color:var(--fade-muted);font-family:var(--fade-mono);margin-left:-3px}
+.fade-ver{font-size:10px;font-family:var(--fade-mono);color:var(--fade-faint);border:1px solid var(--fade-line);border-radius:5px;padding:2px 5px;white-space:nowrap}
 .fade-grow{flex:1;min-width:0}
-.fade-chip{height:20px;padding:0 7px;border-radius:5px;border:1px solid ${T.border};background:transparent;color:${T.muted};font:inherit;font-size:10px;cursor:pointer;font-family:${T.mono}}
-.fade-chip[data-a="1"]{color:${T.brand};border-color:color-mix(in srgb,${T.brand} 45%,transparent);background:color-mix(in srgb,${T.brand} 10%,transparent)}
-.fade-tag{font:9.5px/1 ${T.mono};padding:3px 5px;border-radius:4px;border:1px solid ${T.border};color:${T.muted};white-space:nowrap}
-.fade-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:28px;border-radius:7px;border:1px solid ${T.border};background:transparent;color:${T.text};font:inherit;font-size:11.5px;cursor:pointer}
-.fade-btn:hover{background:${T.layer1}}
-.fade-btn:disabled{opacity:.5;cursor:default}
-.fade-btn[data-p="1"]{border-color:${T.brand};color:${T.brand}}
-.fade-input{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border:1px solid ${T.border};border-radius:7px;background:transparent}
-.fade-input input{flex:1;min-width:0;border:0;background:transparent;color:${T.text};font:inherit;font-size:11.5px;outline:none}
-.fade-sec{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:12px 0 4px}
-.fade-sec h3{margin:0;font-size:10.5px;font-weight:600;color:${T.muted};letter-spacing:.05em}
-.fade-sec span{font-size:10px;color:${T.muted};font-family:${T.mono}}
-.fade-bar{height:3px;border-radius:2px;background:var(--fade-line,rgba(127,127,127,.2));overflow:hidden}
-.fade-bar i{display:block;height:3px;border-radius:2px;background:${T.ok}}
-.fade-warn{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:7px;border:1px solid ${T.border2};background:${T.layer1};color:${T.warn};font-size:10.5px;cursor:pointer;width:100%;text-align:left;font-family:inherit}
-.fade-list{border:1px solid ${T.border};border-radius:9px;overflow:hidden;background:transparent}
-.fade-kv{display:grid;grid-template-columns:46px 1fr;gap:3px 8px;font-size:11px;margin-top:5px}
-.fade-kv dt{color:${T.muted};font-size:10px;margin:0}
-.fade-kv dd{margin:0}
-.fade-quote{margin-top:7px;padding-left:8px;border-left:2px solid ${T.border2};color:${T.muted};font-size:10.5px;line-height:1.6;word-break:break-word}
-.fade-empty{padding:18px 6px;text-align:center;color:${T.muted};font-size:11.5px;line-height:1.7}
-.fade-err{padding:10px;border:1px solid ${T.border2};border-radius:8px;color:${T.danger};background:${T.layer1};font-size:11px;word-break:break-word}
-.fade-pre{white-space:pre-wrap;word-break:break-word;font-family:${T.mono};font-size:10.5px;line-height:1.6;background:${T.layer1};border:1px solid ${T.border};border-radius:8px;padding:8px;max-height:240px;overflow:auto;margin:6px 0 0}
-.fade-legend{display:flex;flex-wrap:wrap;gap:8px;color:${T.muted};font-size:10px;margin-top:4px}
-.fade-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:1px}
-.fade-spin{display:inline-block;width:10px;height:10px;border:1.5px solid ${T.border2};border-top-color:${T.brand};border-radius:50%;animation:fade-spin .8s linear infinite}
+.fade-iconbtn{width:30px;height:30px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--fade-muted);display:grid;place-items:center;cursor:pointer;flex:none}
+.fade-iconbtn:hover{background:var(--fade-surface);border-color:var(--fade-line);color:var(--fade-text)}
+.fade-iconbtn:focus-visible,.fade-tab:focus-visible,.fade-cta:focus-visible,.fade-chip:focus-visible,.fade-btn:focus-visible{outline:2px solid var(--fade-brand);outline-offset:2px}
+.fade-bookrow{display:flex;align-items:center;gap:7px;min-height:28px;margin-top:7px}
+.fade-book{max-width:250px;min-width:0;display:flex;align-items:center;gap:5px;border:0;background:transparent;padding:0;cursor:pointer;color:var(--fade-text);font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden}
+.fade-book b{font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.fade-book svg{color:var(--fade-faint);flex:none}
+.fade-select{max-width:240px;height:24px;border:1px solid var(--fade-line);border-radius:6px;background:var(--fade-surface);color:var(--fade-text);font:inherit;font-size:11px;padding:0 4px;outline:none}
+.fade-chap{font-family:var(--fade-mono);font-size:10px;color:var(--fade-muted);border:1px solid var(--fade-line);border-radius:5px;padding:2px 5px;white-space:nowrap}
+.fade-healthpill{margin-left:auto;display:flex;align-items:center;gap:4px;font-size:9.5px;font-family:var(--fade-mono);color:var(--fade-danger);background:color-mix(in srgb,var(--fade-danger) 8%,transparent);border:1px solid color-mix(in srgb,var(--fade-danger) 22%,transparent);border-radius:99px;padding:2px 7px;white-space:nowrap}
+.fade-healthpill[data-ok="1"]{color:var(--fade-ok);background:color-mix(in srgb,var(--fade-ok) 8%,transparent);border-color:color-mix(in srgb,var(--fade-ok) 22%,transparent)}
+.fade-dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex:none}
+.fade-nav{display:flex;gap:3px;margin-top:9px;padding:3px;border-radius:10px;background:color-mix(in srgb,var(--fade-text) 4%,transparent);border:1px solid var(--fade-line)}
+.fade-tab{flex:1;height:36px;border:0;border-radius:7px;background:transparent;color:var(--fade-muted);font-size:11.5px;cursor:pointer}
+.fade-tab[data-a="1"]{background:var(--fade-surface-2);color:var(--fade-text);box-shadow:inset 0 0 0 1px var(--fade-line-2);font-weight:600}
+.fade-cta{height:36px;padding:0 10px;border-radius:7px;border:1px solid color-mix(in srgb,var(--fade-brand) 38%,transparent);background:var(--fade-brand-soft);color:var(--fade-brand);font-size:10.5px;font-weight:600;display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap}
+.fade-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--fade-line-2) transparent;padding:12px 14px 18px;display:flex;flex-direction:column;gap:12px}
+.fade-body::-webkit-scrollbar{width:8px}
+.fade-body::-webkit-scrollbar-thumb{background:var(--fade-line-2);border-radius:99px}
+.fade-card{background:var(--fade-surface);border:1px solid var(--fade-line);border-radius:12px;padding:12px;position:relative}
+.fade-card-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
+.fade-kicker{font-size:10px;letter-spacing:.1em;color:var(--fade-muted);font-weight:650}
+.fade-meta{font-size:10px;color:var(--fade-faint);font-family:var(--fade-mono);white-space:nowrap}
+.fade-hero{font-size:20px;line-height:1.2;font-weight:700;letter-spacing:-.01em}
+.fade-sub{font-size:10.5px;color:var(--fade-muted)}
+.fade-issue{display:grid;grid-template-columns:3px 1fr;gap:9px;padding:9px 0 8px;border-top:1px solid var(--fade-line)}
+.fade-issue:first-of-type{border-top:0}
+.fade-issue-bar{width:3px;border-radius:2px;background:var(--fade-danger);margin-top:2px}
+.fade-issue-bar.warn{background:var(--fade-warn)}
+.fade-issue-bar.info{background:var(--fade-muted)}
+.fade-issue-top{display:flex;align-items:center;gap:5px;margin-bottom:2px}
+.fade-tag{font-size:9px;line-height:1;padding:3px 5px;border-radius:4px;font-family:var(--fade-mono);white-space:nowrap;border:1px solid var(--fade-line);color:var(--fade-muted)}
+.fade-tag.danger{color:#ffb0a9;background:color-mix(in srgb,var(--fade-danger) 10%,transparent);border-color:color-mix(in srgb,var(--fade-danger) 26%,transparent)}
+.fade-tag.warn{color:#f1ce86;background:color-mix(in srgb,var(--fade-warn) 9%,transparent);border-color:color-mix(in srgb,var(--fade-warn) 24%,transparent)}
+.fade-tag.ok{color:#9fe3c6;background:color-mix(in srgb,var(--fade-ok) 9%,transparent);border-color:color-mix(in srgb,var(--fade-ok) 24%,transparent)}
+.fade-issue-title{font-size:12px;line-height:1.45;font-weight:600}
+.fade-issue-detail{font-size:11px;line-height:1.5;color:var(--fade-muted);margin-top:2px}
+.fade-link{border:0;background:transparent;padding:0;color:var(--fade-brand);font-size:10.5px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;margin-top:3px}
+.fade-budget-line{display:flex;align-items:flex-end;justify-content:space-between;gap:8px}
+.fade-budget-num{font-family:var(--fade-mono);font-size:24px;font-weight:600;letter-spacing:-.03em;line-height:1}
+.fade-budget-num small{font-size:10px;color:var(--fade-muted);font-weight:400;margin-left:2px}
+.fade-budget-save{text-align:right;font-family:var(--fade-mono);font-size:10px;color:var(--fade-ok);line-height:1.4}
+.fade-bar{height:5px;border-radius:99px;background:color-mix(in srgb,var(--fade-text) 7%,transparent);overflow:hidden;margin:9px 0 6px}
+.fade-bar i{display:block;height:5px;border-radius:99px;background:linear-gradient(90deg,#5f9fe0,#7db5f2)}
+.fade-scale{display:flex;justify-content:space-between;color:var(--fade-faint);font-family:var(--fade-mono);font-size:9px}
+.fade-quick{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px}
+.fade-qbtn{height:54px;border:1px solid var(--fade-line);border-radius:10px;background:var(--fade-surface);text-align:left;padding:8px 9px;cursor:pointer;color:var(--fade-text);display:flex;flex-direction:column;justify-content:center;gap:3px}
+.fade-qbtn:hover{background:var(--fade-surface-2)}
+.fade-qbtn[data-p="1"]{background:var(--fade-brand-soft);border-color:color-mix(in srgb,var(--fade-brand) 32%,transparent)}
+.fade-qtop{display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600}
+.fade-qsub{font-size:9px;color:var(--fade-faint);font-family:var(--fade-mono);white-space:nowrap}
+.fade-qbtn[data-p="1"] .fade-qsub{color:var(--fade-brand)}
+.fade-sec{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:2px 0 -4px}
+.fade-sec h3{margin:0;font-size:10px;font-weight:650;color:var(--fade-muted);letter-spacing:.08em}
+.fade-sec span{font-size:10px;color:var(--fade-faint);font-family:var(--fade-mono)}
+.fade-person{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--fade-line);width:100%;border-left:0;border-right:0;border-bottom:0;background:transparent;color:inherit;text-align:left;cursor:pointer}
+.fade-person:first-of-type{border-top:0}
+.fade-avatar{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--fade-surface-2);border:1px solid var(--fade-line);font-family:var(--fade-mono);font-size:10px;color:var(--fade-muted);flex:none}
+.fade-person-main{min-width:0;flex:1}
+.fade-person-name{font-size:11.5px;font-weight:600;display:flex;align-items:center;gap:4px}
+.fade-person-sub{font-size:9.5px;color:var(--fade-faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fade-spark{display:flex;align-items:flex-end;gap:2px;width:42px;flex:none}
+.fade-spark i{width:5px;border-radius:2px;background:var(--fade-brand);opacity:.45}
+.fade-spark i:nth-child(2){background:#8fb4d9;opacity:.6}
+.fade-spark i:nth-child(3){background:var(--fade-ok);opacity:.55}
+.fade-series{display:flex;align-items:center;gap:5px;padding:8px 9px;border:1px dashed var(--fade-line-2);border-radius:8px;color:var(--fade-muted);font-size:9px;flex:none;flex-wrap:wrap}
+.fade-series .fade-dot{width:5px;height:5px}
+.fade-series .sep{color:var(--fade-faint)}
+.fade-series .more{margin-left:auto;color:var(--fade-brand);font-size:9px;border:0;background:transparent;cursor:pointer}
+.fade-search{height:36px;border:1px solid var(--fade-line);border-radius:9px;background:var(--fade-surface);display:flex;align-items:center;gap:7px;padding:0 9px;flex:none;color:var(--fade-faint)}
+.fade-search input{flex:1;min-width:0;border:0;background:transparent;color:var(--fade-text);font:inherit;font-size:11.5px;outline:none}
+.fade-search .kbd{font-family:var(--fade-mono);font-size:8.5px;border:1px solid var(--fade-line);border-radius:4px;padding:2px 4px;color:var(--fade-faint)}
+.fade-seg{display:grid;grid-template-columns:repeat(2,1fr);gap:3px;padding:3px;border-radius:9px;background:color-mix(in srgb,var(--fade-text) 4%,transparent);border:1px solid var(--fade-line);flex:none}
+.fade-seg button{height:30px;border:0;border-radius:6px;background:transparent;color:var(--fade-muted);font-size:10.5px;cursor:pointer}
+.fade-seg button[data-a="1"]{background:var(--fade-surface-2);color:var(--fade-text);font-weight:600;box-shadow:inset 0 0 0 1px var(--fade-line-2)}
+.fade-chips{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:none;padding-bottom:1px}
+.fade-chips::-webkit-scrollbar{display:none}
+.fade-chip{height:28px;padding:0 8px;border-radius:6px;border:1px solid var(--fade-line);background:transparent;color:var(--fade-muted);font-family:var(--fade-mono);font-size:9px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;cursor:pointer;flex:none}
+.fade-chip[data-a="1"]{color:var(--fade-brand);border-color:color-mix(in srgb,var(--fade-brand) 40%,transparent);background:var(--fade-brand-soft)}
+.fade-listmeta{display:flex;align-items:center;justify-content:space-between;color:var(--fade-faint);font-size:9px;font-family:var(--fade-mono);flex:none}
+.fade-mcard{border:1px solid var(--fade-line);border-radius:10px;background:var(--fade-surface);padding:10px 10px 9px;display:flex;flex-direction:column;gap:4px;flex:none;cursor:pointer;text-align:left;font:inherit;color:inherit}
+.fade-mcard:hover{background:var(--fade-surface-2);border-color:var(--fade-line-2)}
+.fade-mcard-h{display:flex;align-items:center;gap:5px;font-family:var(--fade-mono);font-size:9px;color:var(--fade-faint)}
+.fade-layer{font-size:8px;border-radius:3px;padding:1px 3px;border:1px solid var(--fade-line-2);color:var(--fade-muted)}
+.fade-layer[data-l0="1"]{color:var(--fade-warn);border-color:color-mix(in srgb,var(--fade-warn) 32%,transparent)}
+.fade-pin{display:inline-flex;align-items:center;gap:3px;color:var(--fade-brand);font-family:var(--fade-sans,sans-serif);font-size:8.5px}
+.fade-mcard-t{font-size:12px;font-weight:600;line-height:1.45}
+.fade-mcard-s{font-size:10.5px;color:var(--fade-muted);line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.fade-mcard-f{display:flex;align-items:center;gap:5px;margin-top:1px;flex-wrap:wrap}
+.fade-mini{font-size:8.5px;color:var(--fade-faint);border:1px solid var(--fade-line);border-radius:3px;padding:1px 4px;font-family:var(--fade-mono);white-space:nowrap}
+.fade-mini.ok{color:var(--fade-ok);border-color:color-mix(in srgb,var(--fade-ok) 26%,transparent)}
+.fade-mini.warn{color:var(--fade-warn);border-color:color-mix(in srgb,var(--fade-warn) 26%,transparent)}
+.fade-finger{display:flex;gap:2px;align-items:flex-end;margin-left:auto}
+.fade-finger i{width:4px;border-radius:2px;background:var(--fade-brand);opacity:.55}
+.fade-finger i:nth-child(2){background:#8fb4d9}
+.fade-finger i:nth-child(3){background:var(--fade-ok)}
+.fade-empty{padding:24px 10px;text-align:center;color:var(--fade-muted);font-size:11.5px;line-height:1.7}
+.fade-empty b{display:block;color:var(--fade-text);font-size:12px;margin-bottom:4px}
+.fade-error{padding:10px;border:1px solid var(--fade-line-2);border-radius:8px;color:var(--fade-danger);background:var(--fade-surface);font-size:11px;word-break:break-word}
+.fade-loading{display:flex;align-items:center;justify-content:center;gap:7px;padding:24px 8px;color:var(--fade-muted);font-size:11px}
+.fade-spin{width:12px;height:12px;border:1.5px solid var(--fade-line-2);border-top-color:var(--fade-brand);border-radius:50%;animation:fade-spin .8s linear infinite}
 @keyframes fade-spin{to{transform:rotate(360deg)}}
+.fade-tl{display:flex;flex-direction:column}
+.fade-tlgroup{display:flex;gap:8px}
+.fade-tldate{width:42px;flex:none;text-align:right;padding-top:2px}
+.fade-tldate b{display:block;font-family:var(--fade-mono);font-size:9px;color:var(--fade-muted);font-weight:500}
+.fade-tldate span{font-family:var(--fade-mono);font-size:8px;color:var(--fade-faint)}
+.fade-tlrail{width:9px;flex:none;display:flex;flex-direction:column;align-items:center}
+.fade-tlrail i{width:7px;height:7px;border-radius:50%;background:var(--fade-brand);margin-top:4px;flex:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--fade-brand) 12%,transparent)}
+.fade-tlrail i.warn{background:var(--fade-warn);box-shadow:0 0 0 3px color-mix(in srgb,var(--fade-warn) 12%,transparent)}
+.fade-tlrail i.danger{background:var(--fade-danger);box-shadow:0 0 0 3px color-mix(in srgb,var(--fade-danger) 12%,transparent)}
+.fade-tlrail .line{width:1px;flex:1;background:var(--fade-line-2);margin-top:3px}
+.fade-tlbody{flex:1;min-width:0;padding:0 0 13px 2px}
+.fade-tlcard{border:1px solid var(--fade-line);border-radius:9px;background:var(--fade-surface);padding:9px;cursor:pointer}
+.fade-tlcard:hover{background:var(--fade-surface-2)}
+.fade-tlh{display:flex;align-items:center;gap:5px;font-family:var(--fade-mono);font-size:8.5px;color:var(--fade-faint)}
+.fade-type{font-family:var(--fade-sans,sans-serif);font-size:8.5px;border-radius:3px;padding:1px 4px;color:#b9d9ff;background:var(--fade-brand-soft)}
+.fade-type.forget{color:#ffb0a9;background:color-mix(in srgb,var(--fade-danger) 10%,transparent)}
+.fade-type.restore,.fade-type.pin{color:#9fe3c6;background:color-mix(in srgb,var(--fade-ok) 10%,transparent)}
+.fade-tlh .rev{margin-left:auto}
+.fade-tlt{font-size:11px;font-weight:600;margin-top:3px;line-height:1.45}
+.fade-tls{font-size:9.5px;color:var(--fade-muted);margin-top:2px;line-height:1.45}
+.fade-tlf{display:flex;align-items:center;gap:4px;margin-top:5px;flex-wrap:wrap}
+.fade-source-chapters{display:flex;flex-direction:column;gap:4px}
+.fade-source-ch{display:flex;align-items:center;gap:7px;padding:7px 8px;border:1px solid var(--fade-line);border-radius:8px;background:var(--fade-surface);cursor:pointer;color:inherit;text-align:left;width:100%}
+.fade-source-ch[data-a="1"]{border-color:color-mix(in srgb,var(--fade-brand) 38%,transparent);background:var(--fade-brand-soft)}
+.fade-source-ch b{font-family:var(--fade-mono);font-size:10px}
+.fade-source-ch span{font-size:9.5px;color:var(--fade-muted)}
+.fade-source-ch .chars{margin-left:auto;font-family:var(--fade-mono);font-size:8.5px;color:var(--fade-faint)}
+.fade-sourcebox{margin-top:4px;border:1px solid var(--fade-line);border-radius:9px;background:var(--fade-surface);padding:10px}
+.fade-sourcebox .excerpt{white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.75;color:var(--fade-text);max-height:280px;overflow:auto}
+.fade-sourcebox mark{background:color-mix(in srgb,var(--fade-brand) 28%,transparent);color:inherit;border-radius:2px;padding:0 1px}
+.fade-stale{display:flex;gap:6px;align-items:flex-start;padding:8px;border-radius:7px;border:1px solid color-mix(in srgb,var(--fade-warn) 28%,transparent);background:color-mix(in srgb,var(--fade-warn) 8%,transparent);color:var(--fade-warn);font-size:10px;line-height:1.5}
+.fade-sheet-mask{position:absolute;inset:0;background:rgba(4,6,9,.52);backdrop-filter:blur(2px);z-index:20;border-radius:12px}
+.fade-sheet{position:absolute;left:0;right:0;bottom:0;max-height:90%;z-index:21;border-radius:16px 16px 0 0;background:var(--fade-bg);border-top:1px solid var(--fade-line-2);box-shadow:0 -20px 60px rgba(0,0,0,.45);display:flex;flex-direction:column;overflow:hidden}
+.fade-sheet-head{flex:none;padding:9px 14px 0}
+.fade-grab{width:36px;height:4px;border-radius:99px;background:var(--fade-line-2);margin:0 auto 9px}
+.fade-sheet-title{display:flex;align-items:center;gap:8px}
+.fade-sheet-title h2{margin:0;font-size:15px;font-weight:650}
+.fade-sheet-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding:12px 14px 0;display:flex;flex-direction:column;gap:10px}
+.fade-sheet-foot{flex:none;border-top:1px solid var(--fade-line);padding:10px 14px 13px;display:flex;align-items:center;gap:7px}
+.fade-sheet-note{font-size:9px;color:var(--fade-faint);line-height:1.45;flex:1}
+.fade-field{display:flex;align-items:center;gap:8px}
+.fade-flabel{font-size:9.5px;color:var(--fade-muted);width:46px;flex:none}
+.fade-input{height:30px;border:1px solid var(--fade-line);border-radius:7px;background:var(--fade-surface);color:var(--fade-text);font:inherit;font-size:11px;padding:0 8px;outline:none;min-width:0}
+.fade-input:focus{border-color:var(--fade-brand)}
+.fade-btn{height:32px;border-radius:8px;border:1px solid var(--fade-line);background:transparent;color:var(--fade-muted);font-size:10.5px;padding:0 11px;cursor:pointer;white-space:nowrap}
+.fade-btn:hover{background:var(--fade-surface)}
+.fade-btn[data-p="1"]{background:var(--fade-brand);border-color:var(--fade-brand);color:var(--fade-bg);font-weight:600}
+.fade-btn[data-p="1"]:hover{filter:brightness(1.05)}
+.fade-btn:disabled{opacity:.5;cursor:default}
+.fade-stepper{display:flex;align-items:center;gap:2px;border:1px solid var(--fade-line);border-radius:7px;background:var(--fade-surface);padding:2px}
+.fade-stepper button{width:30px;height:30px;border:0;border-radius:5px;background:transparent;color:var(--fade-muted);cursor:pointer;font-size:15px}
+.fade-stepper button:hover{background:var(--fade-surface-2)}
+.fade-stepper b{font-family:var(--fade-mono);font-size:10px;padding:0 5px;white-space:nowrap}
+.fade-preset{display:flex;gap:3px;flex:1}
+.fade-preset button{flex:1;height:27px;border:1px solid var(--fade-line);border-radius:6px;background:transparent;color:var(--fade-muted);font-family:var(--fade-mono);font-size:9px;cursor:pointer}
+.fade-preset button[data-a="1"]{color:var(--fade-brand);border-color:color-mix(in srgb,var(--fade-brand) 40%,transparent);background:var(--fade-brand-soft)}
+.fade-range{position:relative;flex:1;height:22px;display:flex;align-items:center}
+.fade-range input{width:100%;accent-color:var(--fade-brand);height:22px}
+.fade-range-num{font-family:var(--fade-mono);font-size:9px;color:var(--fade-muted);width:38px;text-align:right}
+.fade-cast{display:flex;gap:4px;flex-wrap:wrap}
+.fade-cast button{height:26px;display:inline-flex;align-items:center;gap:4px;padding:0 8px;border-radius:99px;border:1px solid var(--fade-line);color:var(--fade-muted);font-size:9px;background:transparent;cursor:pointer}
+.fade-cast button[data-a="1"]{color:var(--fade-text);border-color:var(--fade-line-2);background:var(--fade-surface)}
+.fade-sum{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 9px;border:1px solid var(--fade-line);border-radius:9px;background:var(--fade-brand-soft);font-size:9px;color:var(--fade-muted)}
+.fade-sum b{color:var(--fade-text);font-weight:600}
+.fade-sum .ok{color:var(--fade-ok);font-family:var(--fade-mono)}
+.fade-srow{border:1px solid var(--fade-line);border-radius:9px;background:var(--fade-surface);padding:9px}
+.fade-srow-h{display:flex;align-items:center;gap:6px}
+.fade-srow-h b{font-size:10.5px;font-weight:600}
+.fade-srow-h .count{margin-left:auto;font-family:var(--fade-mono);font-size:8.5px;color:var(--fade-faint)}
+.fade-srow-h .clip{font-size:8px;color:var(--fade-warn);border:1px solid color-mix(in srgb,var(--fade-warn) 30%,transparent);border-radius:3px;padding:1px 4px}
+.fade-srow-bar{height:3px;border-radius:99px;background:color-mix(in srgb,var(--fade-text) 7%,transparent);overflow:hidden;margin-top:6px}
+.fade-srow-bar i{display:block;height:3px;background:var(--fade-brand);opacity:.7}
+.fade-srow-bar.warn i{background:var(--fade-warn)}
+.fade-srow-body{margin-top:7px;color:var(--fade-muted);font-size:10px;line-height:1.6;white-space:pre-wrap}
+.fade-srow-body em{font-style:normal;color:var(--fade-text)}
+.fade-srow-body .more{color:var(--fade-warn)}
+.fade-sourcemeta{display:flex;justify-content:space-between;gap:6px;color:var(--fade-faint);font-size:9px;font-family:var(--fade-mono);margin-bottom:5px}
+.fade-artifact{display:flex;flex-direction:column;gap:8px}
+.fade-artifact-row{display:grid;grid-template-columns:64px 1fr;gap:6px;font-size:10px}
+.fade-artifact-row dt{color:var(--fade-faint);font-family:var(--fade-mono);font-size:9px;margin:0}
+.fade-artifact-row dd{margin:0;color:var(--fade-text);word-break:break-word;font-size:10px}
+.fade-menu{display:flex;flex-direction:column;gap:2px}
+.fade-menu button{display:flex;align-items:center;gap:8px;padding:10px 8px;border:0;border-bottom:1px solid var(--fade-line);background:transparent;color:var(--fade-text);text-align:left;font-size:11px;cursor:pointer;width:100%}
+.fade-menu button:hover{background:var(--fade-surface)}
+.fade-menu small{color:var(--fade-faint);font-size:9px;display:block}
+.fade-foot{flex:none;display:flex;justify-content:space-between;gap:8px;padding:7px 14px;border-top:1px solid var(--fade-line);color:var(--fade-faint);font-size:9px;font-family:var(--fade-mono)}
+.fade-num{font-family:var(--fade-mono);font-variant-numeric:tabular-nums}
+@media (max-width:380px){
+  .fade-head{padding-left:10px;padding-right:10px}
+  .fade-body{padding-left:10px;padding-right:10px}
+  .fade-title{font-size:14px}
+  .fade-cta{padding:0 7px;font-size:9.5px}
+  .fade-nav .fade-tab{font-size:10.5px}
+  .fade-quick{grid-template-columns:1fr 1fr;gap:6px}
+  .fade-quick :first-child{grid-column:span 2}
+}
+@media (min-width:560px){
+  .fade-body{padding-left:18px;padding-right:18px}
+  .fade-head{padding-left:18px;padding-right:18px}
+  .fade-foot{padding-left:18px;padding-right:18px}
+}
 `
+
     function Styles() {
       return h('style', { 'data-novel-fade': '' }, PALETTE_CSS + CSS)
     }
@@ -246,7 +400,7 @@ window.__ModuleLoader__.load({
       const seq = React.useRef(0)
       const run = React.useCallback(() => {
         const mine = ++seq.current
-        setState((prev) => ({ ...prev, phase: prev.data ? 'ready' : 'loading', error: null }))
+        setState({ phase: 'loading', data: null, error: null })
         Promise.resolve()
           .then(fn)
           .then((value) => {
@@ -275,104 +429,130 @@ window.__ModuleLoader__.load({
       return useRemoteCall(call, [call])
     }
 
-    function useCurve(remote, sessionId, series, chapter, enabled, book) {
+    function useTimeline(remote, sessionId, book, filter, enabled) {
       const call = React.useCallback(() => {
         if (!enabled) return Promise.resolve(null)
         if (!remote || !sessionId) throw new Error('会话还没准备好')
-        const options = { series }
-        if (chapter) options.chapter = chapter
+        const options = { filter, limit: 50 }
         if (book) options.book = book
-        return remote.curve(sessionId, options).then(unwrap)
-      }, [remote, sessionId, series, chapter, enabled, book])
+        return remote.timeline(sessionId, options).then(unwrap)
+      }, [remote, sessionId, book, filter, enabled])
       return useRemoteCall(call, [call])
     }
 
-    function useSourceIndex(remote, sessionId, enabled, book) {
+    function useCharacter(remote, sessionId, book, name, enabled) {
+      const call = React.useCallback(() => {
+        if (!enabled || !name) return Promise.resolve(null)
+        if (!remote || !sessionId) throw new Error('会话还没准备好')
+        const options = { name, limit: 100 }
+        if (book) options.book = book
+        return remote.character(sessionId, options).then(unwrap)
+      }, [remote, sessionId, book, name, enabled])
+      return useRemoteCall(call, [call])
+    }
+
+    function useSourceIndex(remote, sessionId, book, enabled) {
       const call = React.useCallback(() => {
         if (!enabled) return Promise.resolve(null)
         if (!remote || !sessionId) throw new Error('会话还没准备好')
         return remote.sourceIndex(sessionId, book ? { book } : EMPTY_OPTS).then(unwrap)
-      }, [remote, sessionId, enabled, book])
+      }, [remote, sessionId, book, enabled])
       return useRemoteCall(call, [call])
     }
 
     /* ════════════════════════════════════════════════════════════════════════
-     * 4. Small components
+     * 4. Icons + primitives
      * ════════════════════════════════════════════════════════════════════════ */
-    function Chip({ active, onClick, children, title, tone }) {
-      const style = tone
-        ? {
-          color: tone,
-          borderColor: `color-mix(in srgb, ${tone} 45%, transparent)`,
-          background: `color-mix(in srgb, ${tone} 12%, transparent)`,
-        }
-        : undefined
+    function Icon({ name, size = 14 }) {
+      const common = {
+        width: size, height: size, viewBox: '0 0 16 16', fill: 'none',
+        stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round',
+        'aria-hidden': 'true', focusable: 'false', style: { flex: 'none', display: 'block' },
+      }
+      if (name === 'brand') {
+        return h('svg', { width: 15, height: 15, viewBox: '0 0 15 15', fill: 'none', 'aria-hidden': 'true' },
+          h('path', { d: 'M2 4h11', stroke: 'white', strokeOpacity: .95, strokeWidth: 1.4, strokeLinecap: 'round' }),
+          h('path', { d: 'M2 7.5h8', stroke: 'white', strokeOpacity: .7, strokeWidth: 1.4, strokeLinecap: 'round' }),
+          h('path', { d: 'M2 11h4.5', stroke: 'white', strokeOpacity: .42, strokeWidth: 1.4, strokeLinecap: 'round' }))
+      }
+      if (name === 'search') return h('svg', common, h('circle', { cx: 7, cy: 7, r: 4.2 }), h('path', { d: 'M10.2 10.2 14 14' }))
+      if (name === 'spark') return h('svg', { ...common, fill: 'currentColor', stroke: 'none' },
+        h('path', { d: 'M8 1.4l1.5 4.1 4.1 1.5-4.1 1.5L8 12.6 6.5 8.5 2.4 7l4.1-1.5L8 1.4z' }),
+        h('path', { d: 'M13 9.4l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6.6-1.7z', opacity: .55 }))
+      if (name === 'pin') return h('svg', common, h('path', { d: 'M9.7 2.2l4.1 4.1-2 .6-2.6 2.6.2 2.1-1.3 1.3-4.1-4.1 1.3-1.3 2.1.2 2.6-2.6.6-2z' }), h('path', { d: 'M6.2 9.8 2.5 13.5' }))
+      if (name === 'book') return h('svg', common, h('path', { d: 'M2.5 3h6A2 2 0 0 1 10.5 5v8H4.5A2 2 0 0 1 2.5 11V3z' }), h('path', { d: 'M2.5 3v8A2 2 0 0 0 4.5 13h6' }))
+      if (name === 'timeline') return h('svg', common, h('circle', { cx: 8, cy: 2.8, r: 1.3 }), h('path', { d: 'M8 4.4v8.4' }), h('path', { d: 'M5.5 12.8h5' }))
+      if (name === 'more') return h('svg', { ...common, fill: 'currentColor', stroke: 'none' }, h('circle', { cx: 3.2, cy: 8, r: 1.2 }), h('circle', { cx: 8, cy: 8, r: 1.2 }), h('circle', { cx: 12.8, cy: 8, r: 1.2 }))
+      if (name === 'refresh') return h('svg', common, h('path', { d: 'M13 6.3A5 5 0 1 0 13.5 9' }), h('path', { d: 'M13.5 3v3.5H10' }))
+      if (name === 'close') return h('svg', common, h('path', { d: 'M3.5 3.5l9 9M12.5 3.5l-9 9' }))
+      if (name === 'arrow') return h('svg', common, h('path', { d: 'M3 8h10' }), h('path', { d: 'M9.5 4.5 13 8l-3.5 3.5' }))
+      if (name === 'check') return h('svg', common, h('path', { d: 'M3 8.5 6.2 11.5 13 4.5' }))
+      if (name === 'alert') return h('svg', common, h('path', { d: 'M8 2.5 14 13H2L8 2.5z' }), h('path', { d: 'M8 6.2v3.2' }), h('path', { d: 'M8 11.3h.01' }))
+      if (name === 'chevron') return h('svg', common, h('path', { d: 'M4 6l4 4 4-4' }))
+      return null
+    }
+
+    function Btn({ children, primary, onClick, disabled, title }) {
       return h('button', {
-        type: 'button', className: 'fade-chip', 'data-a': active ? '1' : '0', onClick, title, style,
+        type: 'button', className: 'fade-btn', 'data-p': primary ? '1' : '0',
+        onClick, disabled, title,
       }, children)
     }
 
-    function Mark({ size = 14 }) {
-      return h('svg', {
-        width: size, height: size, viewBox: '0 0 24 24', 'aria-hidden': 'true',
-        focusable: 'false', style: { flex: 'none', display: 'block' },
-      },
-      h('path', { d: 'M4 6h16', stroke: T.brand, strokeWidth: 2.6, strokeLinecap: 'round' }),
-      h('path', { d: 'M4 12h11', stroke: T.brand, strokeWidth: 2.6, strokeLinecap: 'round', opacity: 0.62 }),
-      h('path', { d: 'M4 18h6', stroke: T.brand, strokeWidth: 2.6, strokeLinecap: 'round', opacity: 0.3 }))
-    }
-
-    function MiniStat({ label, value, tone, onClick, title }) {
+    function Chip({ active, onClick, children, title }) {
       return h('button', {
-        type: 'button', className: 'fade-mini', onClick, title,
-      },
-      h('div', { className: 'fade-k' }, label),
-      h('div', { className: 'fade-mini-num', style: tone ? { color: tone } : undefined }, String(value)))
-    }
-
-    function Tag({ tone, children }) {
-      return h('span', {
-        className: 'fade-tag',
-        style: tone
-          ? {
-            color: tone,
-            borderColor: `color-mix(in srgb, ${tone} 52%, transparent)`,
-            background: `color-mix(in srgb, ${tone} 13%, transparent)`,
-          }
-          : undefined,
+        type: 'button', className: 'fade-chip', 'data-a': active ? '1' : '0', onClick, title,
       }, children)
     }
 
-    function Bar({ value, tone, track }) {
-      const width = `${Math.round(Math.min(1, Math.max(0, Number(value) || 0)) * 100)}%`
-      return h('div', {
-        className: 'fade-bar',
-        style: { width: '100%', ...(track ? { background: track } : {}) },
-      }, h('i', { style: { width, background: tone ?? T.ok } }))
+    function Tag({ tone = '', children }) {
+      return h('span', { className: `fade-tag ${tone}` }, children)
     }
 
-    function Empty({ children }) {
-      return h('div', { className: 'fade-empty' }, children)
+    function Bar({ value, tone }) {
+      const v = Math.max(0, Math.min(1, Number(value) || 0))
+      return h('div', { className: 'fade-bar' }, h('i', { style: { width: `${v * 100}%`, background: tone } }))
+    }
+
+    function Empty({ title, children }) {
+      return h('div', { className: 'fade-empty' }, title ? h('b', null, title) : null, children)
     }
 
     function Loading({ label }) {
-      return h('div', { className: 'fade-empty' },
-        h('span', { className: 'fade-spin', style: { marginRight: 8, verticalAlign: -1 } }), label || '读取中…')
+      return h('div', { className: 'fade-loading' }, h('span', { className: 'fade-spin' }), label ?? '读取中…')
     }
 
     function ErrorBox({ error, onRetry }) {
       const text = String(error ?? '')
-      // The most common cause while developing: the page reloaded with the new
-      // client but the Host still runs the old plugin entry.
       const staleHost = /unknown|not found|not registered|未注册|没有.*注册|invalid invocation|cannot find/i.test(text)
       return h('div', null,
-        h('div', { className: 'fade-err' }, text),
-        staleHost
-          ? h('div', { style: { marginTop: 6, fontSize: 10.5, color: T.muted, lineHeight: 1.6 } },
-            'Host 可能还是旧代码：重启 DeepSeek Harness（整窗关闭再打开）后重试。')
-          : null,
-        onRetry ? h('div', { style: { marginTop: 8 } },
-          h('button', { type: 'button', className: 'fade-btn', onClick: onRetry }, '重试')) : null)
+        h('div', { className: 'fade-error' },
+          staleHost ? '宿主还在跑旧版；重载插件后再试（插件管理器关→开，或 Ctrl+R）。' : text),
+        onRetry ? h('div', { style: { marginTop: 8 } }, h(Btn, { onClick: onRetry }, '重试')) : null)
+    }
+
+    function SectionTitle({ children, aside }) {
+      return h('div', { className: 'fade-sec' }, h('h3', null, children), aside ? h('span', null, aside) : null)
+    }
+
+    function Sheet({ title, subtitle, onClose, children, footer, wide }) {
+      React.useEffect(() => {
+        const onKey = (event) => { if (event.key === 'Escape') onClose?.() }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+      }, [onClose])
+      return h(React.Fragment, null,
+        h('div', { className: 'fade-sheet-mask', onClick: onClose }),
+        h('div', { className: 'fade-sheet', role: 'dialog', 'aria-modal': 'true', style: wide ? { maxHeight: '94%' } : undefined },
+          h('div', { className: 'fade-sheet-head' },
+            h('div', { className: 'fade-grab' }),
+            h('div', { className: 'fade-sheet-title' },
+              h('h2', null, title),
+              subtitle ? h('span', { className: 'fade-meta' }, subtitle) : null,
+              h('div', { className: 'fade-grow' }),
+              h('button', { type: 'button', className: 'fade-iconbtn', onClick: onClose, 'aria-label': '关闭' }, h(Icon, { name: 'close' })))),
+          h('div', { className: 'fade-sheet-body' }, children),
+          footer ? h('div', { className: 'fade-sheet-foot' }, footer) : null))
     }
 
     /* ════════════════════════════════════════════════════════════════════════
@@ -380,728 +560,432 @@ window.__ModuleLoader__.load({
      * ════════════════════════════════════════════════════════════════════════ */
     function HealthCard({ health, onAction }) {
       const [expanded, setExpanded] = React.useState(false)
-      const all = Array.isArray(health.issues) ? health.issues : []
+      const all = Array.isArray(health?.issues) ? health.issues : []
       const issues = expanded ? all : all.slice(0, 3)
-      const counts = health.counts ?? {}
-      const total = (counts.block ?? 0) + (counts.warn ?? 0) + (counts.info ?? 0)
-      const tone = counts.block ? T.danger : counts.warn ? T.warn : T.ok
-      const label = total
-        ? (counts.block || counts.warn ? `本章体检 · ${total} 项待处理` : `本章体检 · ${total} 条提醒`)
-        : '本章体检 · 通过'
-      return h('div', {
-        className: 'fade-card',
-        style: { marginTop: 10, borderLeft: `3px solid ${tone}`, paddingLeft: 10 },
-      },
-      h('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
-        h('span', { style: { width: 7, height: 7, borderRadius: '50%', background: tone, flex: 'none' } }),
-        h('span', { style: { fontSize: 12, fontWeight: 600 } }, label),
-        h('span', { className: 'fade-grow' }),
-        h('span', { className: 'fade-t2' }, `第 ${health.chapter} 章`)),
-      issues.length
-        ? h('div', { style: { marginTop: 2 } }, issues.map((issue) => h('button', {
-          key: issue.id,
-          type: 'button',
-          className: 'fade-row',
-          style: { padding: '7px 0', textAlign: 'left', alignItems: 'flex-start' },
-          onClick: () => onAction?.(issue.action),
-        },
-        h('span', {
-          style: {
-            width: 3, alignSelf: 'stretch', flex: 'none', borderRadius: 2, marginTop: 2,
-            background: issue.severity === 'block' ? T.danger : issue.severity === 'warn' ? T.warn : T.muted,
+      const counts = health?.counts ?? {}
+      const actionable = (counts.block ?? 0) + (counts.warn ?? 0)
+      const total = actionable
+      const tone = counts.block ? 'var(--fade-danger)' : counts.warn ? 'var(--fade-warn)' : 'var(--fade-ok)'
+      return h('section', { className: 'fade-card' },
+        h('div', { className: 'fade-card-h' },
+          h('div', { className: 'fade-kicker' }, '记忆健康'),
+          h('div', { className: 'fade-meta' }, health?.chapter ? `第 ${health.chapter} 章 · 只读` : '只读')),
+        h('div', { style: { display: 'flex', alignItems: 'baseline', gap: 8, margin: '2px 0 3px' } },
+          h('div', { className: 'fade-hero', style: { color: total ? 'var(--fade-text)' : 'var(--fade-ok)' } },
+            total ? `${total} 项待处理` : (counts.info ? `本章体检 · ${counts.info} 条提醒` : '本章体检 · 通过')),
+          total ? h('div', { className: 'fade-sub' },
+            `${counts.block ? `${counts.block} 项阻断` : ''}${counts.block && counts.warn ? ' · ' : ''}${counts.warn ? `${counts.warn} 项待确认` : ''}${counts.info ? `${counts.block || counts.warn ? ' · ' : ''}${counts.info} 条提醒` : ''}`) : null),
+        issues.length
+          ? h('div', null, issues.map((issue) => h('button', {
+            key: issue.id,
+            type: 'button',
+            className: 'fade-issue',
+            style: { border: 0, background: 'transparent', textAlign: 'left', padding: '9px 0 8px', color: 'inherit', cursor: 'pointer', width: '100%' },
+            onClick: () => onAction?.(issue.action),
           },
-        }),
-        h('div', { className: 'fade-grow' },
-          h('div', { style: { fontSize: 11.5, lineHeight: 1.4, whiteSpace: 'normal' } }, issue.title),
-          h('div', { className: 'fade-t2', style: { whiteSpace: 'normal', marginTop: 2 } }, issue.detail),
-          issue.action?.label
-            ? h('span', { style: { color: T.brand, fontSize: 10, fontFamily: T.mono } }, `${issue.action.label} →`)
-            : null))))
-        : h('div', { className: 'fade-t2', style: { marginTop: 4 } }, '这一章没有发现需要处理的问题。'),
-      health.passed?.length
-        ? h('div', { className: 'fade-t2', style: { marginTop: 6 } },
-          `检查通过 ${health.passed.length} 项：${health.passed.map((item) => item.label).join('、')}`)
-        : null,
-      all.length > 3
-        ? h('button', {
-          type: 'button', className: 'fade-chip', style: { marginTop: 6 },
-          onClick: () => setExpanded((value) => !value),
-        }, expanded ? '收起' : `展开全部 ${all.length} 项`)
-        : null,
-      h('div', { className: 'fade-t2', style: { marginTop: 5, display: 'flex', justifyContent: 'space-between' } },
-        h('span', null, '只读，不自动修改记忆'),
-        h('span', null, health.summary ?? '')))
+          h('span', { className: `fade-issue-bar ${issue.severity === 'block' ? '' : issue.severity === 'warn' ? 'warn' : 'info'}` }),
+          h('div', null,
+            h('div', { className: 'fade-issue-top' },
+              h(Tag, { tone: issue.severity === 'block' ? 'danger' : issue.severity === 'warn' ? 'warn' : '' },
+                issue.severity === 'block' ? '阻断' : issue.severity === 'warn' ? '待确认' : '提醒'),
+              issue.chapter ? h('span', { className: 'fade-meta' }, `第 ${issue.chapter} 章`) : null),
+            h('div', { className: 'fade-issue-title' }, issue.title),
+            h('div', { className: 'fade-issue-detail' }, issue.detail),
+            issue.action?.label ? h('span', { className: 'fade-link' }, issue.action.label, h(Icon, { name: 'arrow', size: 11 })) : null))))
+          : h('div', { className: 'fade-sub', style: { padding: '5px 0' } }, '这一章没有发现需要处理的问题。'),
+        h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, paddingTop: 7, borderTop: '1px solid var(--fade-line)', marginTop: 4 } },
+          h('span', { className: 'fade-sub', style: { color: 'var(--fade-faint)' } },
+            h('span', { style: { color: 'var(--fade-ok)' } }, '✓ '),
+            health?.passed?.length ? `检查通过 ${health.passed.length} 项` : '只读检查'),
+          all.length > 3
+            ? h('button', { type: 'button', className: 'fade-link', onClick: () => setExpanded((value) => !value) }, expanded ? '收起' : `展开 ${all.length} 项`)
+            : null))
     }
 
-    function Overview({ snapshot, mode, onToggleMode, onGo, onBrief, brief, onFaded, onHealthAction }) {
-      const overview = snapshot.overview ?? {}
+    function BudgetCard({ snapshot }) {
+      const overview = snapshot?.overview ?? {}
       const savings = overview.savings ?? {}
-      const decay = overview.decay ?? {}
-      const budget = overview.budget ?? {}
-      const source = overview.source ?? {}
       const currency = overview.currency
-      const people = snapshot.people ?? []
-      const cards = snapshot.cards ?? []
-      const fadedCount = (overview.cards?.distribution?.gist ?? 0) + (overview.cards?.distribution?.feeling ?? 0)
-
-      const scopeRatio = currency?.ratio != null
+      const budget = overview.budget ?? {}
+      const ratio = currency?.ratio != null
         ? currency.ratio
         : (savings.rawChars ? savings.memChars / savings.rawChars : null)
-      const scopeText = currency
-        ? `原文 ${fmt(currency.rawChars)} 字 → 记忆 ${fmt(currency.memChars)} 字`
-        : (savings.rawChars ? `累计 ${savings.chapterCount} 章 · ${fmt(savings.rawChars)} → ${fmt(savings.memChars)} 字` : '还没有可统计的章')
+      const saved = savings.savedTokens
+      const scope = currency
+        ? `本章 ${fmt(currency.rawChars)} 字 → 记忆 ${fmt(currency.memChars)} 字`
+        : savings.rawChars
+          ? `${savings.chapterCount} 章 ${fmt(savings.rawChars)} → ${fmt(savings.memChars)} 字`
+          : '还没有可统计的章'
+      return h('section', { className: 'fade-card' },
+        h('div', { className: 'fade-card-h' },
+          h('div', { className: 'fade-kicker' }, '记忆预算'),
+          h('div', { className: 'fade-meta' }, `${overview.chapters ?? 0} 章 · ${overview.cards?.active ?? 0} 张卡`)),
+        h('div', { className: 'fade-budget-line' },
+          h('div', { className: 'fade-budget-num', style: ratio != null && ratio > 1 ? { color: 'var(--fade-warn)' } : undefined },
+            ratio == null ? '—' : String(Math.round((1 - ratio) * 100)), ratio == null ? null : h('small', null, '%')),
+          h('div', { className: 'fade-budget-save' },
+            h('div', null, saved == null ? '—' : saved >= 0 ? `省 ${fmt(saved)} token` : `多耗 ${fmt(-saved)} token`),
+            h('div', { style: { color: 'var(--fade-faint)' } }, `本章简报 ${fmt(budget.briefChars)} 字`))),
+        h(Bar, { value: ratio == null ? 0 : 1 - ratio, tone: ratio != null && ratio > 1 ? 'var(--fade-warn)' : undefined }),
+        h('div', { className: 'fade-scale' }, h('span', null, scope), h('span', null, `预算 ${fmt(budget.budget)} 字`)))
+    }
 
-      return h('div', null,
-        h('div', { className: 'fade-top' },
-          h('div', { className: 'fade-card' },
-            h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
-              h('span', { className: 'fade-k' }, currency ? '本章记忆预算' : '累计记忆预算'),
-              h('span', { className: 'fade-tag', style: { color: T.muted } }, `简报 ${fmt(budget.briefChars)} 字`)),
-            h('div', { style: { display: 'flex', alignItems: 'flex-end', gap: 8, marginTop: 4 } },
-              h('div', {
-                className: 'fade-big',
-                style: scopeRatio != null && scopeRatio > 1 ? { color: T.warn } : undefined,
-              },
-              scopeRatio == null ? '—' : String(Math.round((1 - scopeRatio) * 100)),
-              scopeRatio == null ? null : h('small', null, '%')),
-              h('div', { className: 'fade-grow' }),
-              h('div', { className: 'fade-t2', style: { textAlign: 'right', whiteSpace: 'normal' } }, scopeText)),
-            h('div', { style: { marginTop: 4 } },
-              h('span', { className: 'fade-k' }, currency ? '这一章少读' : '少读比例')),
-            h('div', { style: { marginTop: 7 } },
-              h(Bar, { value: scopeRatio == null ? 0 : 1 - scopeRatio, tone: scopeRatio != null && scopeRatio > 1 ? T.warn : T.ok })),
-            h('div', { style: { display: 'flex', justifyContent: 'space-between', marginTop: 6 } },
-              h('span', { className: 'fade-k' }, `预算 ${fmt(budget.budget)} 字`),
-              h('span', { className: 'fade-t2', style: { color: savings.savedTokens > 0 ? T.ok : T.muted } },
-                savings.chapterCount
-                  ? (savings.savedTokens >= 0 ? `省 ${fmt(savings.savedTokens)} token` : `多耗 ${fmt(-savings.savedTokens)} token`)
-                  : '—'))),
-          h('div', { className: 'fade-top-side' },
-            h(MiniStat, {
-              label: '人物', value: people.length,
-              onClick: () => onGo('cards', 'people'), title: '看人物卡',
-            }),
-            h(MiniStat, {
-              label: '事件', value: overview.cards?.active ?? 0,
-              onClick: () => onGo('cards', 'events'), title: '看事件卡',
-            }),
-            h(MiniStat, {
-              label: '已褪', value: fadedCount,
-              tone: fadedCount ? T.warn : undefined,
-              onClick: onFaded, title: '只看已经褪色的卡',
-            }))),
-
-        decay.soon
-          ? h('button', {
-            type: 'button', className: 'fade-callout', onClick: () => onGo('curve'),
-          },
-          h('div', { className: 'fade-grow' },
-            h('div', { className: 'fade-callout-t' }, `${decay.soon} 条将在 ${decay.horizon} 章内跌出「脱口而出」`),
-            h('div', { className: 'fade-callout-s' }, '之后写细节前要先翻旧账；点开看是哪几张')),
-          h('span', { style: { fontSize: 11 } }, '→'))
-          : null,
-        decay.recalled
-          ? h('div', { className: 'fade-t2', style: { marginTop: 6 } },
-            `另有 ${decay.recalled} 条已经要翻旧账；L0 硬契约 ${decay.hardKept} 条永不褪色。`)
-          : null,
-
-        snapshot.health ? h(HealthCard, { health: snapshot.health, onAction: onHealthAction }) : null,
-
-        h('div', { className: 'fade-sec' }, h('h3', null, '最近人物'), h('span', null, '按出场章')),
+    function PeopleCard({ people, onPerson }) {
+      return h('section', { className: 'fade-card', style: { paddingBottom: 8 } },
+        h('div', { className: 'fade-card-h' },
+          h('div', { className: 'fade-kicker' }, '最近人物'),
+          h('div', { className: 'fade-meta' }, '按出场章')),
         people.length
-          ? h('div', { className: 'fade-list' }, people.slice(0, 5).map((person) => h('button', {
-            key: person.id, type: 'button', className: 'fade-row', onClick: () => onGo('cards', 'people'),
+          ? h('div', null, people.slice(0, 3).map((person) => h('button', {
+            key: person.id, type: 'button', className: 'fade-person', onClick: () => onPerson(person.name),
           },
-          h('div', { className: 'fade-av' }, (person.name ?? '?').slice(0, 1)),
-          h('div', { className: 'fade-grow' },
-            h('div', { className: 'fade-t1' }, person.name,
-              h('span', { style: { marginLeft: 5, color: T.muted, fontFamily: T.mono, fontSize: 9.5 } }, person.layer ?? '')),
-            h('div', { className: 'fade-t2' }, `第 ${person.lastChapter} 章 · 出场 ${person.appearances} 次`,
+          h('div', { className: 'fade-avatar' }, (person.name ?? '?').slice(0, 1)),
+          h('div', { className: 'fade-person-main' },
+            h('div', { className: 'fade-person-name' }, person.name,
+              h('span', { className: 'fade-mini', style: { border: 0, padding: 0 } }, person.layer ?? '')),
+            h('div', { className: 'fade-person-sub' },
+              `第 ${person.lastChapter ?? '?'} 章 · 出场 ${person.appearances ?? 0} 次`,
               person.relationship ? ` · ${person.relationship}` : '')),
-          h('div', { style: { display: 'flex', flexDirection: 'column', gap: 3, width: 54 } },
-            h(Bar, { value: person.familiarity, tone: T.brand }),
-            h(Bar, { value: person.accessibility, tone: T.ok }),
-            h(Bar, { value: person.fidelity, tone: T.warn }))))) 
-          : h(Empty, null, '还没有人物卡；memo_digest 时会自动建。'),
-
-        h('div', { className: 'fade-sec' }, h('h3', null, '最近事件'), h('span', null, `最新 ${Math.min(4, cards.length)} 条`)),
-        cards.length
-          ? h('div', { className: 'fade-tl' }, cards.slice(0, 4).map((card, index, list) => h('button', {
-            key: card.id, type: 'button', className: 'fade-tl-row', onClick: () => onGo('cards', 'events', card.id),
-          },
-          h('div', { className: 'fade-tl-rail' },
-            h('span', { className: 'fade-tl-dot', style: { background: PERMISSION_TONE[card.permission] ?? T.muted } }),
-            index < list.length - 1 ? h('span', { className: 'fade-tl-line' }) : null),
-          h('div', { className: 'fade-tl-body' },
-            h('div', { className: 'fade-t1' },
-              h('span', { className: 'fade-tl-ch' }, `第 ${card.chapter} 章`), card.topic,
-              card.emotion ? h('span', { style: { color: T.muted } }, ` · ${card.emotion}`) : null),
-            h('div', { className: 'fade-t2' },
-              [card.cause ? `因 ${card.cause}` : '', card.effect ? `果 ${card.effect}` : ''].filter(Boolean).join(' → ')
-              || (card.entityNames.length ? card.entityNames.join('、') : card.placeName || '—'))))))
-          : h(Empty, null, '还没有事件卡。'),
-
-        h('div', { className: 'fade-sec' }, h('h3', null, '原文贮存'), h('span', null, source.chapters ? `${source.chapters} 章` : '未开启')),
-        h('button', { type: 'button', className: 'fade-info', onClick: () => onGo('source') },
-          h('span', { style: { color: T.muted, fontSize: 12 } }, '▤'),
-          h('div', { className: 'fade-grow' },
-            h('div', { style: { fontSize: 11.5 } },
-              source.chapters ? `${source.chapters} 章原句已存 · ${(Number(source.bytes || 0) / 1048576).toFixed(1)} MB` : '还没有原文；digest 会自动存'),
-            h('div', { className: 'fade-t2' }, '只存不用：写作只拿简报和卡，要对原句才取')),
-          h('span', { style: { color: T.muted, fontSize: 11 } }, '→')),
-
-        h('div', { style: { marginTop: 14 } },
-          h('button', {
-            type: 'button', className: 'fade-primary',
-            disabled: brief.phase === 'loading',
-            onClick: onBrief,
-          }, brief.phase === 'loading' ? '生成中…' : '生成本章简报（只读）')),
-        brief.phase === 'error' ? h('div', { style: { marginTop: 8 } }, h(ErrorBox, { error: brief.error, onRetry: onBrief })) : null,
-        brief.data?.ok
-          ? h('div', null,
-            h('div', { className: 'fade-t2', style: { marginTop: 8 } },
-              `简报 ${fmt(brief.data.chars)} 字 / 预算 ${fmt(brief.data.budget)}；不调用模型`),
-            h('pre', { className: 'fade-pre' }, brief.data.markdown ?? ''))
-          : null,
-        brief.data && brief.data.ok === false
-          ? h('div', { style: { marginTop: 8 } }, h('div', { className: 'fade-err' }, brief.data.error ?? '生成失败'))
-          : null)
+          h('div', { className: 'fade-spark' },
+            h('i', { style: { height: 5 + Math.round((person.familiarity ?? 0) * 10) } }),
+            h('i', { style: { height: 4 + Math.round((person.accessibility ?? 0) * 9) } }),
+            h('i', { style: { height: 3 + Math.round((person.fidelity ?? 0) * 8) } })))))
+          : h(Empty, { title: '还没有人物卡' }, 'memo_digest 时会自动建。'))
     }
 
-    /* ════════════════════════════════════════════════════════════════════════
-     * 6. Cards
-     * ════════════════════════════════════════════════════════════════════════ */
-    function CardDetail({ card, onClose, onLocateSource, onEntity, cached }) {
-      const hasSource = Array.isArray(cached) && cached.includes(card.chapter)
-      return h('div', { className: 'fade-card', style: { marginTop: 8 } },
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-          h('span', { className: 'fade-k' }, `第 ${card.chapter} 章 · ${card.layer}`),
-          h('span', { className: 'fade-grow' }),
-          h(Tag, { tone: PERMISSION_TONE[card.permission] }, card.permissionLabel),
-          h('button', { type: 'button', className: 'fade-chip', onClick: onClose }, '×')),
-        h('div', { style: { fontSize: 13, fontWeight: 600, marginTop: 5 } }, card.topic),
-        h('dl', { className: 'fade-kv' },
-          card.emotion ? [h('dt', { key: 'e' }, '情绪'), h('dd', { key: 'ev' }, card.emotion)] : null,
-          card.cause || card.effect
-            ? [h('dt', { key: 'c' }, '因→果'), h('dd', { key: 'cv' }, `${card.cause || '—'} → ${card.effect || '—'}`)]
-            : null,
-          card.entityNames.length || card.placeName
-            ? [h('dt', { key: 'p' }, '涉及'),
-              h('dd', { key: 'pv', style: { display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' } },
-                card.entityNames.map((name) => h('button', {
-                  key: name, type: 'button', className: 'fade-chip',
-                  title: '只看这个人',
-                  onClick: () => onEntity?.(name),
-                }, name)),
-                card.placeName ? h('span', { style: { color: T.muted } }, card.placeName) : null)]
-            : null,
-          [h('dt', { key: 'd' }, '三维'),
-            h('dd', { key: 'dv', className: 'fade-num', style: { fontSize: 10.5 } },
-              `熟 ${card.familiarity} · 可及 ${card.accessibility} · 保真 ${card.fidelity}`)]),
-        card.gist ? h('div', { style: { fontSize: 11.5, lineHeight: 1.65, marginTop: 6 } }, card.gist) : null,
-        card.gist === '' && card.permission !== 'precise' && card.permission !== 'recall'
-          ? h('div', { style: { fontSize: 10.5, color: T.muted, marginTop: 6 } }, '这张卡被褪色了：只保留主题与情绪。')
-          : null,
-        card.quote ? h('div', { className: 'fade-quote' }, card.quote) : null,
-        h('div', { style: { marginTop: 8, display: 'flex', gap: 6 } },
-          h('button', {
-            type: 'button', className: 'fade-btn', onClick: () => onLocateSource(card),
-          }, hasSource ? '回查这一章的原句（已存）' : '查看原文片段（按需取）')),
-        h('div', { className: 'fade-t2', style: { marginTop: 6 } },
-          `原文位置：第 ${card.chapter} 章 · ${hasSource ? '已存进原文贮存，未载入' : '原文未存（memo_ingest 可补）'}`))
-    }
-
-    function ChapterDetail({ remote, sessionId, book, chapter, onClose, onShowCards, onLocateSource }) {
-      const [state, setState] = React.useState({ phase: 'loading', data: null, error: null })
-      React.useEffect(() => {
-        if (!remote || !sessionId || !chapter) return undefined
-        let cancelled = false
-        setState({ phase: 'loading', data: null, error: null })
-        const options = { chapter }
-        if (book) options.book = book
-        remote.chapter(sessionId, options)
-          .then(unwrap)
-          .then((value) => { if (!cancelled) setState({ phase: 'ready', data: value, error: null }) })
-          .catch((error) => { if (!cancelled) setState({ phase: 'error', data: null, error: String(error?.message ?? error) }) })
-        return () => { cancelled = true }
-      }, [remote, sessionId, book, chapter])
-
-      const data = state.data
-      const sheet = data?.sheet ?? null
-      const meta = data?.meta ?? {}
-      const layers = data?.layers ?? {}
-      const distribution = data?.distribution ?? {}
-
-      return h('div', { className: 'fade-card', style: { marginTop: 6 } },
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-          h('span', { className: 'fade-k' }, `第 ${chapter} 章`),
-          meta.highlight ? h(Tag, { tone: T.warn }, '高光') : null,
-          meta.source === 'model' && (meta.climaxLevel >= 2) ? h(Tag, { tone: T.muted }, '模型推断') : null,
-          h('span', { className: 'fade-grow' }),
-          h('button', { type: 'button', className: 'fade-chip', onClick: onClose }, '×')),
-
-        state.phase === 'loading' ? h(Loading, { label: '读这一章…' }) : null,
-        state.phase === 'error' ? h(ErrorBox, { error: state.error }) : null,
-        data && data.exists === false ? h(Empty, null, data.message ?? '这一章还没有 digest。') : null,
-
-        data && data.exists
-          ? h('div', null,
-            data.title
-              ? h('div', { style: { fontSize: 13, fontWeight: 600, marginTop: 5 } }, data.title)
-              : null,
-            h('div', { className: 'fade-t2', style: { marginTop: 3 } },
-              `${data.cardCount} 张卡 · ${fmt(data.chars)} 字 · v${data.digestVersion}` +
-              ` · L0 ${layers.L0 ?? 0} / L1 ${layers.L1 ?? 0} / L2 ${layers.L2 ?? 0} / L3 ${layers.L3 ?? 0}` +
-              (data.faded ? ` · 已褪 ${data.faded}` : '')),
-            data.faded
-              ? h('div', { className: 'fade-t2', style: { marginTop: 4, whiteSpace: 'normal', color: T.warn } },
-                `这一章有 ${data.faded} 条卡只剩大意；要写细节得回查原文。`)
-              : null,
-
-            sheet
-              ? h('div', null,
-                (sheet.scene?.location || sheet.scene?.time || (sheet.scene?.entities ?? []).length)
-                  ? h('div', { className: 'fade-kv', style: { marginTop: 6 } },
-                    [h('dt', { key: 'l' }, '场景'),
-                      h('dd', { key: 'lv' },
-                        [sheet.scene.location, sheet.scene.time].filter(Boolean).join(' · ') || '—',
-                        (sheet.scene.entities ?? []).length
-                          ? h('span', { style: { color: T.muted } }, `　在场：${sheet.scene.entities.join('、')}`)
-                          : null)])
-                  : null,
-                (sheet.beats ?? []).length
-                  ? h('div', { style: { marginTop: 6 } },
-                    h('div', { className: 'fade-k' }, '关键动作'),
-                    h('ul', { style: { margin: '3px 0 0', paddingLeft: 16, fontSize: 11, lineHeight: 1.7 } },
-                      sheet.beats.map((beat, index) => h('li', { key: index }, beat))))
-                  : null,
-                (sheet.keyLines ?? []).length
-                  ? h('div', { style: { marginTop: 6 } },
-                    h('div', { className: 'fade-k' }, '关键句'),
-                    sheet.keyLines.map((line, index) => h('div', { key: index, className: 'fade-quote' }, line)))
-                  : null,
-                sheet.ending
-                  ? h('div', { style: { marginTop: 6 } },
-                    h('div', { className: 'fade-k' }, '结尾'),
-                    h('div', { className: 'fade-quote' }, sheet.ending))
-                  : null,
-                (sheet.openThreads ?? []).length
-                  ? h('div', { style: { marginTop: 6 } },
-                    h('div', { className: 'fade-k' }, '未闭合线索'),
-                    h('ul', { style: { margin: '3px 0 0', paddingLeft: 16, fontSize: 11, lineHeight: 1.7 } },
-                      sheet.openThreads.map((thread, index) => h('li', { key: index }, thread))))
-                  : null)
-              : h('div', { className: 'fade-t2', style: { marginTop: 6 } }, '这一章没有 scene sheet（digest 时没给 sheet）。'),
-
-            (data.threads ?? []).length
-              ? h('div', { style: { marginTop: 6 } },
-                h('div', { className: 'fade-k' }, '本章埋的线索'),
-                data.threads.map((thread) => h('div', { key: thread.id, className: 'fade-t2', style: { whiteSpace: 'normal' } },
-                  `${thread.type}${thread.dueChapter ? `（第 ${thread.dueChapter} 章到期）` : ''}：${thread.text}`)))
-              : null,
-
-            h('div', { style: { marginTop: 8, display: 'flex', gap: 6 } },
-              h('button', { type: 'button', className: 'fade-btn', onClick: () => onShowCards(data.chapter) },
-                `看这一章的 ${data.cardCount} 张卡`),
-              h('button', { type: 'button', className: 'fade-btn', onClick: () => onLocateSource({ chapter: data.chapter, quote: '' }) },
-                data.sourceCached ? '回查本章原文（已存）' : '回查本章原文（未存）')))
-          : null)
-    }
-
-    function CardsSection({
-      snapshot, kind, onKind, query, onQuery, selected, onSelect, chapter, onChapter, onLocateSource,
-      cards, total, hasMore, onMore, chapterFilter, onClearChapter, loadingMore,
-      entityFilter, placeFilter, onEntity, onPlace, cachedChapters, fadedOnly, onFaded, fadedCount,
-      remote, sessionId, book, chapterOpen, onOpenChapter, onCloseChapter, onChapterCards,
-    }) {
-      const people = snapshot.people ?? []
-      const places = snapshot.places ?? []
-      const chapters = snapshot.chapters ?? []
-      const selectedCard = cards.find((card) => card.id === selected) ?? null
-      const count = kind === 'people' ? people.length
-        : kind === 'places' ? places.length
-          : kind === 'chapters' ? chapters.length : total
-
-      return h('div', null,
-        h('div', { className: 'fade-input' },
-          h('span', { style: { color: T.muted } }, '⌕'),
-          h('input', {
-            value: query, placeholder: '搜主题 / 人物 / 地点',
-            onChange: (event) => onQuery(event.target.value),
-          }),
-          query ? h('button', { type: 'button', className: 'fade-chip', onClick: () => onQuery('') }, '清') : null,
-          h('span', { className: 'fade-tag' }, `共 ${count}`)),
-        h('div', { style: { display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' } },
-          h(Chip, { active: kind === 'events', onClick: () => onKind('events') }, '事件'),
-          h(Chip, { active: kind === 'chapters', onClick: () => onKind('chapters') }, `章节 ${chapters.length}`),
-          h(Chip, { active: kind === 'people', onClick: () => onKind('people') }, `人物 ${people.length}`),
-          h(Chip, { active: kind === 'places', onClick: () => onKind('places') }, `地点 ${places.length}`),
-          fadedCount
-            ? h(Chip, {
-              active: fadedOnly, tone: fadedOnly ? T.warn : undefined, onClick: onFaded,
-              title: '只看已经褪色的卡；这些卡只留大意，需要原句要回查原文',
-            }, `已褪 ${fadedCount}`)
-            : null,
-          chapterFilter
-            ? h(Chip, { active: true, onClick: onClearChapter, title: '取消章号筛选' }, `第 ${chapterFilter} 章 ×`)
-            : null,
-          entityFilter
-            ? h(Chip, { active: true, onClick: () => onEntity(null), title: '取消人物筛选' }, `${entityFilter} ×`)
-            : null,
-          placeFilter
-            ? h(Chip, { active: true, onClick: () => onPlace(null), title: '取消地点筛选' }, `${placeFilter} ×`)
-            : null),
-
-        selectedCard ? h(CardDetail, {
-          card: selectedCard, onClose: () => onSelect(null), onLocateSource, onEntity,
-          cached: cachedChapters,
-        }) : null,
-
-        chapterOpen
-          ? h(ChapterDetail, {
-            remote, sessionId, book, chapter: chapterOpen,
-            onClose: onCloseChapter,
-            onShowCards: onChapterCards,
-            onLocateSource: (target) => onLocateSource(target),
-          })
-          : null,
-
-        kind === 'people'
-          ? (people.length
-            ? h('div', { className: 'fade-list', style: { marginTop: 6 } }, people.map((person) => h('button', {
-              key: person.id, type: 'button', className: 'fade-row',
-              'data-a': entityFilter === person.name ? '1' : '0',
-              onClick: () => onEntity(entityFilter === person.name ? null : person.name),
-            },
-            h('div', { className: 'fade-av' }, (person.name ?? '?').slice(0, 1)),
-            h('div', { className: 'fade-grow' },
-              h('div', { className: 'fade-t1' }, person.name,
-                h('span', { style: { marginLeft: 5, color: T.muted, fontFamily: T.mono, fontSize: 9.5 } }, person.layer ?? '')),
-              h('div', { className: 'fade-t2' }, `第 ${person.lastChapter} 章 · ${person.appearances} 次`,
-                person.relationship ? ` · ${person.relationship}` : '')),
-            h('div', { style: { display: 'flex', gap: 3 } },
-              h(Tag, { tone: person.recallable ? T.ok : T.warn }, person.recallable ? '可召回' : '仅大意')))))
-            : h(Empty, null, '没有匹配的人物。'))
-
-          : kind === 'places'
-            ? (places.length
-              ? h('div', { className: 'fade-list', style: { marginTop: 6 } }, places.map((place) => h('button', {
-                key: place.id, type: 'button', className: 'fade-row',
-                'data-a': placeFilter === place.name ? '1' : '0',
-                onClick: () => onPlace(placeFilter === place.name ? null : place.name),
-              },
-              h('div', { className: 'fade-av' }, (place.name ?? '?').slice(0, 1)),
-              h('div', { className: 'fade-grow' },
-                h('div', { className: 'fade-t1' }, place.name),
-                h('div', { className: 'fade-t2' }, `第 ${place.lastVisit} 章 · 到访 ${place.visits} 次`,
-                  place.state ? ` · ${place.state}` : '')),
-              h('div', { style: { display: 'flex', gap: 3 } },
-                h(Tag, { tone: T.muted }, `可及 ${place.accessibility.toFixed(2)}`)))))
-              : h(Empty, null, '还没有地点。'))
-
-          : kind === 'chapters'
-            ? (chapters.length
-              ? h('div', { className: 'fade-list', style: { marginTop: 6 } }, chapters.map((chapterRow) => h('button', {
-                key: chapterRow.chapter, type: 'button', className: 'fade-row',
-                'data-a': chapterOpen === chapterRow.chapter ? '1' : '0',
-                onClick: () => onOpenChapter(chapterOpen === chapterRow.chapter ? null : chapterRow.chapter),
-              },
-              h('div', { className: 'fade-av' }, String(chapterRow.chapter)),
-              h('div', { className: 'fade-grow' },
-                h('div', { className: 'fade-t1' }, chapterRow.title || `第 ${chapterRow.chapter} 章`),
-                h('div', { className: 'fade-t2' }, `${chapterRow.cards} 卡 · ${fmt(chapterRow.chars)} 字${chapterRow.hasSheet ? ' · 结尾 ✓' : ''}${chapterRow.faded ? ` · ${chapterRow.faded} 条已褪` : ''}`)),
-              h(Tag, { tone: chapterRow.chapter === chapter ? T.brand : undefined }, chapterRow.chapter === chapter ? '当前' : `v${chapterRow.digestVersion}`))))
-              : h(Empty, null, '还没有章节记忆卡。'))
-
-            : (cards.length
-              ? h('div', { className: 'fade-list', style: { marginTop: 6 } }, cards.map((card) => h('button', {
-                key: card.id, type: 'button', className: 'fade-row', 'data-a': selected === card.id ? '1' : '0',
-                onClick: () => onSelect(selected === card.id ? null : card.id),
-              },
-              h('div', { className: 'fade-av', style: { boxShadow: `inset 0 0 0 1px ${T.border}, inset 2px 0 0 ${PERMISSION_TONE[card.permission] ?? T.border}` } }, String(card.chapter)),
-              h('div', { className: 'fade-grow' },
-                h('div', { className: 'fade-t1' }, card.topic),
-                h('div', { className: 'fade-t2' },
-                  [card.emotion, card.entityNames.join('、'), card.placeName].filter(Boolean).join(' · ') || '—')),
-              h(Tag, { tone: PERMISSION_TONE[card.permission] }, card.permission))))
-              : h(Empty, null, query ? '没有匹配的卡。' : '还没有事件卡。')),
-        hasMore && kind === 'events'
-          ? h('div', { style: { marginTop: 8 } },
-            h('button', {
-              type: 'button', className: 'fade-btn', disabled: loadingMore, onClick: onMore,
-            }, loadingMore ? '加载中…' : `加载更多（还有 ${Math.max(1, total - cards.length)} 条）`))
-          : null)
-    }
-
-    /* ════════════════════════════════════════════════════════════════════════
-     * 7. Curve
-     * ════════════════════════════════════════════════════════════════════════ */
-    const CURVE_COLORS = [T.brand, T.ok, T.warn, T.c3, T.c4]
-
-    function Curve({ data, width }) {
-      const boxWidth = Math.max(240, width || 360)
-      const height = 190
-      const pad = { l: 26, r: 8, t: 12, b: 20 }
-      const innerW = boxWidth - pad.l - pad.r
-      const innerH = height - pad.t - pad.b
-      const from = 1
-      const to = Math.max(from + 1, data?.x?.to ?? 1)
-      const lines = data?.lines ?? []
-      const threshold = Number(data?.threshold ?? 0.35)
-      const px = (chapter) => pad.l + ((chapter - from) / Math.max(1, to - from)) * innerW
-      const py = (value) => pad.t + (1 - Math.min(1, Math.max(0, value))) * innerH
-
-      return h('div', null,
-        h('svg', {
-          width: '100%', viewBox: `0 0 ${boxWidth} ${height}`, style: { display: 'block' },
-          role: 'img', 'aria-label': '记忆衰退曲线',
-        },
-        h('rect', { x: pad.l, y: py(threshold), width: innerW, height: Math.max(0, height - pad.b - py(threshold)), fill: T.warn, opacity: 0.055 }),
-        h('line', { x1: pad.l, x2: pad.l + innerW, y1: py(threshold), y2: py(threshold), stroke: T.warn, strokeOpacity: 0.5, strokeDasharray: '3 3' }),
-        [0, 0.25, 0.5, 0.75, 1].map((tick) => h('g', { key: tick },
-          h('line', { x1: pad.l, x2: pad.l + innerW, y1: py(tick), y2: py(tick), stroke: T.border, strokeWidth: 1 }),
-          h('text', { x: 2, y: py(tick) + 3, fill: T.muted, fontSize: 8, fontFamily: T.mono }, String(tick)))),
-        lines.map((line, index) => h('polyline', {
-          key: line.id,
-          fill: 'none',
-          stroke: CURVE_COLORS[index % CURVE_COLORS.length],
-          strokeWidth: 1.7,
-          strokeLinejoin: 'round',
-          points: (line.points ?? []).map(([chapter, value]) => `${px(chapter)},${py(value)}`).join(' '),
-        })),
-        h('line', {
-          x1: px(to), x2: px(to), y1: pad.t, y2: pad.t + innerH,
-          stroke: T.muted, strokeOpacity: 0.35, strokeDasharray: '2 3',
-        }),
-        h('text', { x: px(to) - 2, y: pad.t + 8, fill: T.muted, fontSize: 8, fontFamily: T.mono, textAnchor: 'end' }, `第 ${to} 章`),
-        h('text', { x: pad.l, y: height - 5, fill: T.muted, fontSize: 8, fontFamily: T.mono }, String(from)),
-        h('text', { x: pad.l + innerW, y: height - 5, fill: T.muted, fontSize: 8, fontFamily: T.mono, textAnchor: 'end' }, String(to))),
-        h('div', { className: 'fade-legend' },
-          lines.map((line, index) => h('span', { key: line.id },
-            h('i', { className: 'fade-dot', style: { background: CURVE_COLORS[index % CURVE_COLORS.length] } }), line.label)),
-          h('span', null, h('i', { className: 'fade-dot', style: { background: T.warn } }), `可及性 < ${threshold}：细节要翻旧账`)))
-    }
-
-    function CurveSection({ curve, series, onSeries, width }) {
-      return h('div', null,
-        h('div', { style: { display: 'flex', gap: 4, alignItems: 'center' } },
-          h(Chip, { active: series === 'people', onClick: () => onSeries('people') }, '人物'),
-          h(Chip, { active: series === 'cards', onClick: () => onSeries('cards') }, '事件'),
-          h(Chip, { active: series === 'chapters', onClick: () => onSeries('chapters') }, '章节'),
-          h('div', { className: 'fade-grow' }),
-          h('span', { className: 'fade-t2' }, curve.data ? `${curve.data.x?.points ?? 0} 点` : '')),
-        curve.phase === 'loading' && !curve.data ? h(Loading, { label: '采样中…' }) : null,
-        curve.phase === 'error' ? h(ErrorBox, { error: curve.error, onRetry: curve.reload }) : null,
-        curve.data
-          ? h('div', null,
-            h('div', { className: 'fade-card', style: { marginTop: 6, padding: '6px 4px 2px' } },
-              h(Curve, { data: curve.data, width })),
-            h('div', { className: 'fade-t2', style: { marginTop: 6 } },
-              '每章取一点，可及性由本地推导，不调用模型；L0 硬契约不进采样，始终可召回。'),
-            (curve.data.lines ?? []).length === 0
-              ? h(Empty, null, '还没有可采样的卡。')
-              : null,
-            (() => {
-              const values = (curve.data.lines ?? []).flatMap((line) => (line.points ?? []).map(([, value]) => value))
-              if (values.length === 0) return null
-              const lowest = Math.min(...values)
-              return lowest > 0.6
-                ? h('div', { className: 'fade-t2', style: { marginTop: 4, whiteSpace: 'normal', lineHeight: 1.6 } },
-                  `当前最低 ${lowest.toFixed(2)}：这本书的卡多是 L0/L1，衰减还不明显；L2 普通事件多起来后曲线才会压下去。`)
-                : null
-            })())
-          : null)
-    }
-
-    /* ════════════════════════════════════════════════════════════════════════
-     * 8. Source
-     * ════════════════════════════════════════════════════════════════════════ */
-    function SourceExcerpt({ result }) {
-      const text = result?.text ?? ''
-      if (!text) return h('pre', { className: 'fade-pre' }, '（空）')
-      const offset = Number.isInteger(result.offset) ? result.offset : null
-      const end = Number.isInteger(result.endOffset) ? result.endOffset : null
-      const base = Number.isInteger(result.excerptStart) ? result.excerptStart : 0
-      if (offset == null || end == null) return h('pre', { className: 'fade-pre' }, text)
-      const start = offset - base
-      const stop = end - base
-      if (start < 0 || stop <= start || stop > text.length) return h('pre', { className: 'fade-pre' }, text)
-      return h('pre', { className: 'fade-pre' },
-        text.slice(0, start),
-        h('mark', {
-          style: {
-            background: 'rgba(125,149,251,.28)', color: 'inherit',
-            borderRadius: 2, padding: '0 1px',
-          },
-        }, text.slice(start, stop)),
-        text.slice(stop))
-    }
-
-    function SourceSection({ index, remote, sessionId, inline, fadedChapters, book }) {
-      const [term, setTerm] = React.useState(inline?.query ?? '')
-      const [result, setResult] = React.useState(null)
-      const [busy, setBusy] = React.useState(false)
-      const [error, setError] = React.useState(null)
-      const [chapter, setChapter] = React.useState(inline?.chapter ?? null)
-      // 从卡片跳进来时，inline 那条 effect 已经取过片段，不要再自动取一次。
-      const skipAuto = React.useRef(false)
-
-      const run = async (targetChapter = chapter ?? inline?.chapter, targetTerm = term) => {
-        if (!remote || !sessionId) return
-        if (!targetChapter) {
-          setError('先选一章，再搜索。')
-          return
-        }
-        setBusy(true)
-        setError(null)
-        try {
-          const value = unwrap(await remote.sourceSlice(sessionId, {
-            ...(book ? { book } : {}),
-            chapter: targetChapter,
-            ...(String(targetTerm || '').trim() ? { query: String(targetTerm).trim() } : { from: 0, len: 2000 }),
-          }))
-          setResult(value)
-        } catch (err) {
-          setError(String(err?.message ?? err))
-        } finally {
-          setBusy(false)
-        }
+    function SeriesStrip({ companions, onOpen }) {
+      const beat = companions?.beat
+      const beatLabel = !beat ? '未加载'
+        : beat.state === 'available' ? '账本已关联'
+          : beat.state === 'adapted' ? '本地账本'
+            : '未发现'
+      const beatTone = beat?.state === 'available' ? 'var(--fade-ok)'
+        : beat?.state === 'adapted' ? 'var(--fade-warn)' : 'var(--fade-faint)'
+      const others = [
+        ['conductor', companions?.conductor],
+        ['voice', companions?.voice],
+        ['fanfic', companions?.fanfic],
+      ]
+      const missing = others.filter(([, row]) => !row || row.state === 'unavailable').length
+      const labelFor = (name, row) => {
+        if (!row) return '未加载'
+        if (row.state === 'available') return '可用'
+        if (row.state === 'adapted') return '未适配'
+        return '未发现'
       }
+      const toneFor = (row) => row?.state === 'available' ? 'var(--fade-ok)'
+        : row?.state === 'adapted' ? 'var(--fade-warn)'
+          : row?.state === 'unknown' ? 'var(--fade-muted)' : 'var(--fade-faint)'
+      return h('div', { className: 'fade-series' },
+        h('i', { className: 'fade-dot', style: { color: beatTone } }),
+        h('span', null, `beat ${beatLabel}`),
+        h('span', { className: 'sep' }, '·'),
+        missing === others.length
+          ? h('span', null, `其余 ${others.length} 个未发现`)
+          : others.map(([name, row], index) => h(React.Fragment, { key: name },
+            index ? h('span', { className: 'sep' }, '·') : null,
+            h('i', { className: 'fade-dot', style: { color: toneFor(row) } }),
+            h('span', null, `${name} ${labelFor(name, row)}`))),
+        h('button', { type: 'button', className: 'more', onClick: onOpen }, '协作详情'))
+    }
 
-      React.useEffect(() => {
-        if (!inline?.chapter) return
-        setChapter(inline.chapter)
-        if (inline.query) setTerm(inline.query)
-        skipAuto.current = true
-        run(inline.chapter, inline.query)
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [])
-
-      // 选中一章就直接给开头一段，不用再点「搜」；从卡片跳进来的那次跳过。
-      React.useEffect(() => {
-        if (!chapter) return
-        if (skipAuto.current) {
-          skipAuto.current = false
-          return
-        }
-        run(chapter, '')
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [chapter])
-
-      const chapters = index?.data?.chapters ?? []
-      const enabled = index?.data?.enabled !== false
-      const fadedMap = new Map((fadedChapters ?? []).map((row) => [row.chapter, row.faded ?? 0]))
-
-      return h('div', null,
-        h('div', { style: { display: 'flex', gap: 6, alignItems: 'center' } },
-          h('span', { className: 'fade-k' }, enabled ? '原文贮存' : '原文贮存已关闭'),
-          h('div', { className: 'fade-grow' }),
-          h('span', { className: 'fade-t2' }, chapters.length ? `${chapters.length} 章 · ${(Number(index.data.bytes || 0) / 1048576).toFixed(1)} MB` : '0 章')),
-        h('div', { className: 'fade-t2', style: { marginTop: 4, whiteSpace: 'normal', lineHeight: 1.6 } },
-          '每写完一章自动存这里，只存不用：写作只拿简报和卡；哪一章的卡被褪掉了、要核对原句，才下来取片段（≤4000 字），不随会话发送。'),
-
-        index.phase === 'loading' ? h(Loading, null) : null,
-        index.phase === 'error' ? h(ErrorBox, { error: index.error, onRetry: index.reload }) : null,
-
-        !enabled
-          ? h(Empty, null, '没有开启原文贮存。卡与简报不受影响；要查原文，先让模型 memo_ingest 一章。')
-          : chapters.length === 0
-            ? h(Empty, null, '索引还是空的：下次 memo_digest 会自动把这一章存进来，也可以让模型对旧章跑 memo_ingest 补齐。')
-            : h('div', { className: 'fade-list', style: { marginTop: 8, maxHeight: 220, overflow: 'auto' } },
-              chapters.slice().reverse().map((row) => h('button', {
-                key: row.chapter, type: 'button', className: 'fade-row',
-                'data-a': chapter === row.chapter ? '1' : '0',
-                onClick: () => { setChapter(row.chapter); setResult(null); setError(null) },
-              },
-              h('div', { className: 'fade-av' }, String(row.chapter)),
-              h('div', { className: 'fade-grow' },
-                h('div', { className: 'fade-t1' }, row.title || `第 ${row.chapter} 章`),
-                h('div', { className: 'fade-t2' }, `${fmt(row.chars)} 字 · ${row.at ? row.at.slice(0, 10) : ''}${fadedMap.get(row.chapter) ? ` · ${fadedMap.get(row.chapter)} 条已褪` : ''}`)),
-              h(Tag, { tone: chapter === row.chapter ? T.brand : undefined }, chapter === row.chapter ? '选中' : '查看')))),
-
-        h('div', { className: 'fade-input', style: { marginTop: 8 } },
-          h('span', { style: { color: T.muted } }, '⌕'),
-          h('input', {
-            value: term, placeholder: chapter ? `在第 ${chapter} 章里找…` : '先选一章',
-            onChange: (event) => setTerm(event.target.value),
-            onKeyDown: (event) => { if (event.key === 'Enter') run() },
-          }),
-          h('button', { type: 'button', className: 'fade-chip', disabled: busy, onClick: () => run() }, busy ? '…' : '搜')),
-
-        error ? h('div', { style: { marginTop: 8 } }, h('div', { className: 'fade-err' }, error)) : null,
-        result
-          ? h('div', { style: { marginTop: 8 } },
-            h('div', { className: 'fade-t2' }, result.ok
-              ? `第 ${result.chapter} 章 · 偏移 ${result.offset}${result.endOffset != null ? `–${result.endOffset}` : ''}${result.truncated ? ' · 已截断' : ''}${result.stale === true ? ' · 原文已变化' : result.stale === false ? ' · sha 校验通过' : ''}${result.note ? ` · ${result.note}` : ''}`
-              : '没取到'),
-            result.ok
-              ? h(SourceExcerpt, { result })
-              : h('div', { className: 'fade-err', style: { marginTop: 6 } }, result.message ?? result.code ?? '取不到'),
-            result.ok && result.stale === true
-              ? h('div', { className: 'fade-err', style: { marginTop: 6 } },
-                '原文已变化：旧偏移可能不再准确；建议重新 digest 这一章，或重新 memo_ingest。')
-              : null)
-          : null)
+    function Overview({ snapshot, onPerson, onSearch, onSource, onProvenance, onBrief, onSeries, onHealthAction }) {
+      const people = snapshot.people ?? []
+      return h(React.Fragment, null,
+        snapshot.health ? h(HealthCard, { health: snapshot.health, onAction: onHealthAction }) : null,
+        h(BudgetCard, { snapshot }),
+        h('div', { className: 'fade-quick' },
+          h('button', { type: 'button', className: 'fade-qbtn', 'data-p': '1', onClick: onSearch },
+            h('div', { className: 'fade-qtop' }, h(Icon, { name: 'search', size: 12 }), '搜记忆'),
+            h('div', { className: 'fade-qsub' }, `${snapshot.overview?.cards?.active ?? 0} 张卡 · 人物`)),
+          h('button', { type: 'button', className: 'fade-qbtn', onClick: onSource },
+            h('div', { className: 'fade-qtop' }, h(Icon, { name: 'book', size: 12 }), '补原文'),
+            h('div', { className: 'fade-qsub' }, `${snapshot.overview?.source?.chapters ?? 0} / ${snapshot.overview?.chapters ?? 0} 章`)),
+          h('button', { type: 'button', className: 'fade-qbtn', onClick: onProvenance },
+            h('div', { className: 'fade-qtop' }, h(Icon, { name: 'timeline', size: 12 }), '看溯源'),
+            h('div', { className: 'fade-qsub' }, '时间线 · 收据'))),
+        h(PeopleCard, { people, onPerson }),
+        h(SeriesStrip, { companions: snapshot.companions, onOpen: onSeries }))
     }
 
     /* ════════════════════════════════════════════════════════════════════════
-     * 9. Shell
+     * 6. Memory
      * ════════════════════════════════════════════════════════════════════════ */
-    const SECTIONS = [
-      ['overview', '总览'],
-      ['cards', '卡片'],
-      ['curve', '曲线'],
-      ['source', '原文'],
-    ]
+    function CardItem({ card, onOpen }) {
+      return h('button', { type: 'button', className: 'fade-mcard', onClick: () => onOpen(card) },
+        h('div', { className: 'fade-mcard-h' },
+          h('span', null, `第 ${card.chapter} 章`),
+          h('span', { className: 'fade-layer', 'data-l0': card.layer === 'L0' ? '1' : '0' }, card.layer),
+          card.pinned ? h('span', { className: 'fade-pin' }, h(Icon, { name: 'pin', size: 10 }), '作者钉住') : null),
+        h('div', { className: 'fade-mcard-t' }, card.topic),
+        card.gist ? h('div', { className: 'fade-mcard-s' }, card.gist) : null,
+        h('div', { className: 'fade-mcard-f' },
+          h('span', { className: `fade-mini ${card.permission === 'precise' ? 'ok' : card.permission === 'recall' ? 'warn' : ''}` }, card.permissionLabel),
+          (card.entityNames ?? []).slice(0, 2).map((name) => h('span', { key: name, className: 'fade-mini' }, name)),
+          card.placeName ? h('span', { className: 'fade-mini' }, card.placeName) : null,
+          h('span', { className: 'fade-finger' },
+            h('i', { style: { height: 3 + Math.round((card.familiarity ?? 0) * 6) } }),
+            h('i', { style: { height: 3 + Math.round((card.accessibility ?? 0) * 6) } }),
+            h('i', { style: { height: 3 + Math.round((card.fidelity ?? 0) * 6) } }))))
+    }
 
+    function PersonRow({ person, onOpen }) {
+      return h('button', { type: 'button', className: 'fade-person', onClick: () => onOpen(person.name) },
+        h('div', { className: 'fade-avatar' }, (person.name ?? '?').slice(0, 1)),
+        h('div', { className: 'fade-person-main' },
+          h('div', { className: 'fade-person-name' }, person.name,
+            person.layer ? h('span', { className: 'fade-mini', style: { border: 0, padding: 0 } }, person.layer) : null),
+          h('div', { className: 'fade-person-sub' },
+            `第 ${person.lastChapter ?? '?'} 章 · 出场 ${person.appearances ?? 0} 次 · ${person.cards ?? 0} 张卡`,
+            person.relationship ? ` · ${person.relationship}` : '')),
+        h('div', { className: 'fade-spark' },
+          h('i', { style: { height: 5 + Math.round((person.familiarity ?? 0) * 10) } }),
+          h('i', { style: { height: 4 + Math.round((person.accessibility ?? 0) * 9) } }),
+          h('i', { style: { height: 3 + Math.round((person.fidelity ?? 0) * 8) } })))
+    }
+
+    function MemoryPane({
+      snapshot, cards, total, hasMore, onMore, loadingMore, people,
+      query, onQuery, onSearchFocus, searchRef,
+      pinnedOnly, onPinned, fadedOnly, onFaded,
+      view, onView, onCard, onPerson, chapterFilter, onClearChapter,
+    }) {
+      const fadedCount = (snapshot.overview?.cards?.distribution?.gist ?? 0) + (snapshot.overview?.cards?.distribution?.feeling ?? 0)
+      const pinnedCount = snapshot.overview?.pinned ?? cards.filter((card) => card.pinned).length
+      const shownPeople = query
+        ? people.filter((person) => `${person.name} ${(person.aliases ?? []).join(' ')} ${person.relationship ?? ''}`.includes(query))
+        : people
+      return h(React.Fragment, null,
+        h('div', { className: 'fade-search' },
+          h(Icon, { name: 'search', size: 14 }),
+          h('input', {
+            ref: searchRef,
+            value: query,
+            onChange: (event) => onQuery(event.target.value),
+            placeholder: view === 'cards' ? '搜人物、事件、地点…' : '搜人物…',
+            'aria-label': '搜记忆',
+            onFocus: onSearchFocus,
+          }),
+          query
+            ? h('button', { type: 'button', className: 'fade-link', style: { marginTop: 0 }, onClick: () => onQuery('') }, '清空')
+            : h('span', { className: 'kbd' }, '/')),
+        h('div', { className: 'fade-seg' },
+          h('button', { type: 'button', 'data-a': view === 'cards' ? '1' : '0', onClick: () => onView('cards') }, `卡片 ${total}`),
+          h('button', { type: 'button', 'data-a': view === 'people' ? '1' : '0', onClick: () => onView('people') }, `人物 ${people.length}`)),
+        view === 'cards'
+          ? h(React.Fragment, null,
+            h('div', { className: 'fade-chips' },
+              h(Chip, { active: !pinnedOnly && !fadedOnly && !chapterFilter, onClick: () => { onPinned(false); onFaded(false); onClearChapter() } }, '全部'),
+              h(Chip, { active: pinnedOnly, onClick: () => { onPinned(!pinnedOnly); onFaded(false) } }, `已钉住 ${pinnedCount}`),
+              h(Chip, { active: fadedOnly, onClick: () => { onFaded(!fadedOnly); onPinned(false) } }, `已褪 ${fadedCount}`),
+              chapterFilter ? h(Chip, { active: true, onClick: onClearChapter }, `第 ${chapterFilter} 章 ×`) : null),
+            h('div', { className: 'fade-listmeta' }, h('span', null, `${total} 张 · 按章降序`), h('span', null, '⌄')),
+            cards.length
+              ? cards.map((card) => h(CardItem, { key: card.id, card, onOpen: onCard }))
+              : h(Empty, { title: '没有匹配的记忆' }, query ? '换更短的词，或清空筛选。' : '先写完一章跑 memo_digest。'),
+            hasMore ? h('button', { type: 'button', className: 'fade-btn', onClick: onMore, disabled: loadingMore }, loadingMore ? '加载中…' : '加载更多') : null)
+          : (shownPeople.length
+            ? h('div', null, shownPeople.map((person) => h(PersonRow, { key: person.id, person, onOpen: onPerson })))
+            : h(Empty, { title: '没有匹配的人物' }, '人物来自 digest 时的 entities；没有卡不等于没出场。')))
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════
+     * 7. Provenance
+     * ════════════════════════════════════════════════════════════════════════ */
+    const TIMELINE_TYPES = [
+      ['all', '全部'],
+      ['digest', '沉淀'],
+      ['replace', '重做'],
+      ['forget', '遗忘'],
+      ['restore', '恢复'],
+      ['pin', '钉住'],
+    ]
+    const TIMELINE_LABEL = { digest: '沉淀', replace: '重做', forget: '遗忘', restore: '恢复', pin: '钉住', unpin: '取消钉住' }
+    const TIMELINE_TONE = { digest: '', replace: 'warn', forget: 'danger', restore: '', pin: '' }
+
+    function TimelinePane({ data, phase, error, onRetry, filter, onFilter, onOpen }) {
+      if (!data) return phase === 'error' ? h(ErrorBox, { error, onRetry }) : h(Loading, { label: '读取变更记录…' })
+      if (data.exists === false) return h(Empty, { title: '这本书还没有变更记录' }, '第一次 digest 后，这里会出现时间线。')
+      const entries = data.entries ?? []
+      return h(React.Fragment, null,
+        h('div', { className: 'fade-chips' },
+          TIMELINE_TYPES.map(([id, label]) => h(Chip, {
+            key: id, active: filter === id, onClick: () => onFilter(id),
+          }, `${label} ${data.counts?.[id] ?? 0}`))),
+        h('div', { className: 'fade-listmeta' }, h('span', null, `${data.counts?.all ?? 0} 条 · 最新在前`), h('span', null, '只读')),
+        entries.length
+          ? h('div', { className: 'fade-tl' }, entries.map((entry, index) => h('div', { key: entry.eventId, className: 'fade-tlgroup' },
+            h('div', { className: 'fade-tldate' }, h('b', null, dayLabel(entry.at)), h('span', null, clock(entry.at))),
+            h('div', { className: 'fade-tlrail' },
+              h('i', { className: TIMELINE_TONE[entry.type] ?? '' }),
+              index < entries.length - 1 ? h('span', { className: 'line' }) : null),
+            h('div', { className: 'fade-tlbody' },
+              h('div', { className: 'fade-tlcard', onClick: () => onOpen(entry) },
+                h('div', { className: 'fade-tlh' },
+                  h('span', { className: `fade-type ${entry.type}` }, TIMELINE_LABEL[entry.type] ?? entry.type),
+                  entry.chapter ? h('span', null, `第 ${entry.chapter} 章`) : null,
+                  entry.revision != null ? h('span', { className: 'rev' }, `rev ${entry.revision}`) : null),
+                h('div', { className: 'fade-tlt' }, entry.title),
+                entry.summary ? h('div', { className: 'fade-tls' }, entry.summary) : null,
+                h('div', { className: 'fade-tlf' },
+                  entry.artifactId ? h('span', { className: 'fade-mini' }, entry.artifactId) : null,
+                  entry.cardIds?.length ? h('span', { className: 'fade-mini' }, `${entry.cardIds.length} 张`) : null,
+                  entry.canOpen ? h('span', { className: 'fade-mini ok' }, '可打开') : null))))))
+          : h(Empty, { title: '这个筛选下没有事件' }, '换一个筛选。'))
+    }
+
+    function SourceResult({ result }) {
+      if (!result) return null
+      if (!result.ok) return h(Empty, { title: '原文未缓存' }, result.message ?? '先 memo_ingest 把这一章存进来。')
+      if (!result.text) return h(Empty, { title: '没有命中' }, '换一个关键词，或直接看这一章。')
+      return h('div', { className: 'fade-sourcebox' },
+        result.stale === true
+          ? h('div', { className: 'fade-stale' },
+            h(Icon, { name: 'alert', size: 13 }),
+            h('span', null, '原文已变化，无法保证定位准确。记忆时的 sha 与当前文件不一致；建议重新 digest 这一章。'))
+          : null,
+        h('div', { className: 'fade-sourcemeta' },
+          h('span', null, `第 ${result.chapter} 章 · 第 ${fmt(result.offset)} 字`),
+          h('span', null, result.sha256 ? `sha ${shortHash(result.sha256)}${result.stale === false ? ' · 校验通过' : ''}` : 'sha 未校验')),
+        h('div', { className: 'excerpt' }, result.text),
+        h('div', { className: 'fade-scroll-note', style: { marginTop: 6, color: 'var(--fade-faint)', fontSize: 9, fontFamily: 'var(--fade-mono)' } },
+          `共 ${fmt(result.total)} 字${result.truncated ? ' · 已截取' : ''}`))
+    }
+
+    function ArtifactLookup({ input, onInput, result, busy, onLookup }) {
+      const artifact = result?.artifact
+      return h('section', { className: 'fade-card' },
+        h('div', { className: 'fade-card-h' },
+          h('div', { className: 'fade-kicker' }, '按 ID 回查'),
+          h('div', { className: 'fade-meta' }, '只读')),
+        h('div', { style: { display: 'flex', gap: 6 } },
+          h('input', {
+            className: 'fade-input', value: input, placeholder: 'digest:ch12:v2 / forget:… / pin:…',
+            onChange: (event) => onInput(event.target.value),
+            onKeyDown: (event) => { if (event.key === 'Enter') onLookup(false) },
+            'aria-label': 'artifactId',
+          }),
+          h(Btn, { onClick: () => onLookup(false), disabled: busy || !input.trim() }, busy ? '查…' : '回查'),
+          h(Btn, { onClick: () => onLookup(true), disabled: busy || !input.trim(), title: '重新计算原文 sha' }, '验证')),
+        result && result.found === false
+          ? h('div', { className: 'fade-sub', style: { marginTop: 8 } }, result.reason === 'not-found' ? '没有这条产物；可能是 id 写错，或旧账没有收据。' : (result.message ?? '没有找到。'))
+          : null,
+        artifact
+          ? h('dl', { className: 'fade-artifact-row', style: { marginTop: 9 } },
+            h('dt', null, 'kind'), h('dd', null, artifact.kind),
+            h('dt', null, 'revision'), h('dd', null, artifact.revision ?? '—（旧账）'),
+            h('dt', null, 'hash'), h('dd', { className: 'fade-num' }, shortHash(artifact.hash)),
+            h('dt', null, 'exists'), h('dd', null, artifact.exists === false ? '已被后续版本覆盖' : '仍在'),
+            h('dt', null, 'legacy'), h('dd', null, artifact.legacy ? '旧账，无完整收据' : '完整收据'),
+            h('dt', null, 'integrity'), h('dd', null, artifact.integrity ?? 'declared'),
+            artifact.ids?.length ? h('dt', null, 'ids') : null,
+            artifact.ids?.length ? h('dd', { className: 'fade-num' }, artifact.ids.join('、')) : null)
+          : null)
+    }
+
+    function ProvenancePane({
+      view, onView, timeline, timelineData, timelineFilter, onTimelineFilter, onTimelineEntry,
+      sourceIndex, sourceChapter, onSourceChapter, sourceQuery, onSourceQuery, onLoadSource,
+      sourceResult, sourceBusy, artifactInput, onArtifactInput, artifactResult, artifactBusy, onArtifact,
+    }) {
+      return h(React.Fragment, null,
+        h('div', { className: 'fade-seg' },
+          h('button', { type: 'button', 'data-a': view === 'timeline' ? '1' : '0', onClick: () => onView('timeline') }, `时间线 ${timeline?.counts?.all ?? 0}`),
+          h('button', { type: 'button', 'data-a': view === 'source' ? '1' : '0', onClick: () => onView('source') }, `原文 ${sourceIndex?.chapters?.length ?? 0}`)),
+        view === 'timeline'
+          ? h(TimelinePane, { data: timeline, phase: timelineData.phase, error: timelineData.error, onRetry: timelineData.reload, filter: timelineFilter, onFilter: onTimelineFilter, onOpen: onTimelineEntry })
+          : h(React.Fragment, null,
+            h('div', { className: 'fade-search' },
+              h(Icon, { name: 'search', size: 14 }),
+              h('input', {
+                value: sourceQuery,
+                onChange: (event) => onSourceQuery(event.target.value),
+                onKeyDown: (event) => { if (event.key === 'Enter' && sourceChapter) onLoadSource(sourceChapter) },
+                placeholder: '在原文里找一句…',
+                'aria-label': '搜原文',
+              }),
+              h('button', { type: 'button', className: 'fade-link', style: { marginTop: 0 }, onClick: () => sourceChapter && onLoadSource(sourceChapter) }, '定位')),
+            sourceIndex?.chapters?.length
+              ? h('div', { className: 'fade-source-chapters' }, sourceIndex.chapters.map((entry) => h('button', {
+                key: entry.chapter, type: 'button', className: 'fade-source-ch', 'data-a': sourceChapter === entry.chapter ? '1' : '0',
+                onClick: () => onSourceChapter(entry.chapter),
+              },
+              h('b', null, `第 ${entry.chapter} 章`),
+              h('span', null, entry.title || '已存原文'),
+              h('span', { className: 'chars' }, `${fmt(entry.chars)} 字`))))
+              : h(Empty, { title: '还没有原文缓存' }, '新章 digest 会自动存；旧章用 memo_ingest。'),
+            sourceBusy ? h(Loading, { label: '读原文…' }) : h(SourceResult, { result: sourceResult }),
+            h(ArtifactLookup, {
+              input: artifactInput, onInput: onArtifactInput,
+              result: artifactResult, busy: artifactBusy, onLookup: onArtifact,
+            })))
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════
+     * 8. Tab shell
+     * ════════════════════════════════════════════════════════════════════════ */
     function FadeTab(props) {
       const sessionId = sessionIdOf(props?.sessionId)
       const remote = props?.remote ?? null
       const [bookPicked, setBookPicked] = React.useState(null)
       const panel = usePanel(remote, sessionId, bookPicked)
-      const [section, setSection] = React.useState('overview')
-      const [kind, setKind] = React.useState('events')
-      const [selected, setSelected] = React.useState(null)
+      const base = panel.data?.panel ?? null
+      const mode = panel.data?.mode?.on ?? null
+      const harness = (() => {
+        try { return window.__FADE_UI_HARNESS__ ?? null } catch { return null }
+      })()
+      const [tab, setTab] = React.useState(harness?.tab ?? 'overview')
+      const [memoryView, setMemoryView] = React.useState(harness?.memoryView ?? 'cards')
+      const [provenanceView, setProvenanceView] = React.useState(harness?.provenanceView ?? 'timeline')
       const [query, setQuery] = React.useState('')
       const [debounced, setDebounced] = React.useState('')
       const [chapterFilter, setChapterFilter] = React.useState(null)
-      const [entityFilter, setEntityFilter] = React.useState(null)
-      const [placeFilter, setPlaceFilter] = React.useState(null)
+      const [pinnedOnly, setPinnedOnly] = React.useState(false)
       const [fadedOnly, setFadedOnly] = React.useState(false)
-      const [chapterOpen, setChapterOpen] = React.useState(null)
       const [filtered, setFiltered] = React.useState(null)
-      const [sourceCursor, setSourceCursor] = React.useState(null)
-      const [brief, setBrief] = React.useState({ phase: 'idle', data: null, error: null })
-      const [curveSeries, setCurveSeries] = React.useState('people')
-      const [width, setWidth] = React.useState(360)
+      const [more, setMore] = React.useState([])
+      const [moreBusy, setMoreBusy] = React.useState(false)
+      const [sheet, setSheet] = React.useState(harness?.sheet ?? null)
+      const [timelineFilter, setTimelineFilter] = React.useState('all')
+      const [sourceChapter, setSourceChapter] = React.useState(null)
+      const [sourceQuery, setSourceQuery] = React.useState('')
+      const [sourceResult, setSourceResult] = React.useState(null)
+      const [sourceBusy, setSourceBusy] = React.useState(false)
+      const [artifactInput, setArtifactInput] = React.useState('')
+      const [artifactResult, setArtifactResult] = React.useState(null)
+      const [artifactBusy, setArtifactBusy] = React.useState(false)
+      const [width, setWidth] = React.useState(420)
       const [scheme] = React.useState(() => detectScheme())
       const rootRef = React.useRef(null)
+      const searchRef = React.useRef(null)
+      const sourceSeq = React.useRef(0)
+      const artifactSeq = React.useRef(0)
+
+      const snapshot = filtered ?? base
+      const book = bookPicked ?? snapshot?.book ?? null
 
       React.useEffect(() => {
-        const id = setTimeout(() => setDebounced(query.trim()), 260)
+        const id = setTimeout(() => setDebounced(query.trim()), 240)
         return () => clearTimeout(id)
       }, [query])
 
-      const hasFilter = Boolean(debounced || chapterFilter || entityFilter || placeFilter || fadedOnly)
       React.useEffect(() => {
-        if (!hasFilter || !remote || !sessionId) {
-          setFiltered(null)
-          return undefined
+        if (!remote || !sessionId) return undefined
+        const onKey = (event) => {
+          const el = event.target
+          const tag = el?.tagName
+          if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return
+          if (event.key === '/') {
+            event.preventDefault()
+            searchRef.current?.focus()
+          } else if (event.key === 'b') {
+            event.preventDefault()
+            setSheet({ type: 'brief' })
+          }
         }
-        let cancelled = false
-        const options = { limit: 60 }
-        if (bookPicked) options.book = bookPicked
-        if (debounced) options.query = debounced
-        if (chapterFilter) options.chapter = chapterFilter
-        if (entityFilter) options.entity = entityFilter
-        if (placeFilter) options.place = placeFilter
-        if (fadedOnly) options.permission = ['gist', 'feeling']
-        remote.panel(sessionId, options)
-          .then(unwrap)
-          .then((value) => { if (!cancelled) setFiltered(value) })
-          .catch((error) => { if (!cancelled) console.error('[novel-fade] 筛选失败', error) })
-        return () => { cancelled = true }
-      }, [hasFilter, debounced, chapterFilter, entityFilter, placeFilter, fadedOnly, remote, sessionId])
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+      }, [remote, sessionId])
 
       React.useEffect(() => {
         if (!rootRef.current || typeof ResizeObserver !== 'function') return undefined
@@ -1113,35 +997,73 @@ window.__ModuleLoader__.load({
         return () => observer.disconnect()
       }, [width])
 
-      const snapshot = filtered ?? panel.data?.panel ?? null
-      const mode = panel.data?.mode?.on ?? null
-      const curve = useCurve(remote, sessionId, curveSeries, snapshot?.chapter, section === 'curve', bookPicked)
-      const sourceIndex = useSourceIndex(remote, sessionId, section === 'source', bookPicked)
+      const hasFilter = Boolean(debounced || chapterFilter || pinnedOnly || fadedOnly)
+      React.useEffect(() => {
+        if (!hasFilter || !remote || !sessionId) {
+          setFiltered(null)
+          return undefined
+        }
+        let cancelled = false
+        const options = { limit: 60 }
+        if (bookPicked) options.book = bookPicked
+        if (debounced) options.query = debounced
+        if (chapterFilter) options.chapter = chapterFilter
+        if (pinnedOnly) options.pinned = true
+        if (fadedOnly) options.permission = ['gist', 'feeling']
+        remote.panel(sessionId, options)
+          .then(unwrap)
+          .then((value) => { if (!cancelled) setFiltered(value) })
+          .catch((error) => { if (!cancelled) console.error('[novel-fade] 筛选失败', error) })
+        return () => { cancelled = true }
+      }, [hasFilter, debounced, chapterFilter, pinnedOnly, fadedOnly, remote, sessionId, bookPicked])
+
+      const cards = React.useMemo(() => {
+        const rows = [...(snapshot?.cards ?? []), ...more]
+        rows.sort((a, b) => ((b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)) || ((b.chapter ?? 0) - (a.chapter ?? 0)))
+        return rows
+      }, [snapshot?.cards, more])
+      const totalCards = snapshot?.pagination?.total ?? cards.length
+      const hasMore = totalCards > cards.length
+
+      React.useEffect(() => { setMore([]) }, [snapshot?.generatedAt, debounced, chapterFilter, pinnedOnly, fadedOnly])
+
+      const timeline = useTimeline(remote, sessionId, book, timelineFilter, tab === 'provenance')
+      const sourceIndex = useSourceIndex(remote, sessionId, book, tab === 'provenance')
 
       const switchBook = (next) => {
-        if (!next || next === (snapshot?.book ?? null)) return
+        if (!next || next === snapshot?.book) return
+        sourceSeq.current += 1
+        artifactSeq.current += 1
         setBookPicked(next)
         setQuery('')
         setDebounced('')
         setChapterFilter(null)
-        setEntityFilter(null)
-        setPlaceFilter(null)
+        setPinnedOnly(false)
         setFadedOnly(false)
         setFiltered(null)
-        setSelected(null)
         setMore([])
-        setSourceCursor(null)
-        setBrief({ phase: 'idle', data: null, error: null })
+        setSheet(null)
+        setTab('overview')
+        setTimelineFilter('all')
+        setSourceChapter(null)
+        setSourceQuery('')
+        setSourceResult(null)
+        setSourceBusy(false)
+        setArtifactInput('')
+        setArtifactResult(null)
+        setArtifactBusy(false)
       }
 
-      // 「加载更多」只在事件列表里用；换筛选/快照/章号时清空。
-      const [more, setMore] = React.useState([])
-      const [moreBusy, setMoreBusy] = React.useState(false)
-      const moreKey = `${snapshot?.generatedAt ?? ''}|${debounced}|${chapterFilter ?? ''}|${entityFilter ?? ''}|${placeFilter ?? ''}`
-      React.useEffect(() => { setMore([]) }, [moreKey])
+      const toggleMode = async () => {
+        if (!remote || !sessionId || mode == null) return
+        try {
+          unwrap(await remote.setMode(sessionId, !mode))
+          panel.reload()
+        } catch (error) {
+          console.error('[novel-fade] 切换失败', error)
+        }
+      }
 
-      const cards = (snapshot?.cards ?? []).concat(more)
-      const totalCards = snapshot?.pagination?.total ?? cards.length
       const loadMore = async () => {
         if (!remote || !sessionId || moreBusy) return
         setMoreBusy(true)
@@ -1150,8 +1072,7 @@ window.__ModuleLoader__.load({
           if (bookPicked) options.book = bookPicked
           if (debounced) options.query = debounced
           if (chapterFilter) options.chapter = chapterFilter
-          if (entityFilter) options.entity = entityFilter
-          if (placeFilter) options.place = placeFilter
+          if (pinnedOnly) options.pinned = true
           if (fadedOnly) options.permission = ['gist', 'feeling']
           const next = unwrap(await remote.panel(sessionId, options))
           setMore((prev) => {
@@ -1166,191 +1087,635 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const toggleMode = async () => {
-        if (!remote || !sessionId || mode == null) return
-        try {
-          unwrap(await remote.setMode(sessionId, !mode))
-          panel.reload()
-        } catch (error) {
-          console.error('[novel-fade] 切换失败', error)
-        }
-      }
-
-      const generateBrief = async () => {
-        if (!remote || !sessionId) return
-        setBrief({ phase: 'loading', data: null, error: null })
-        try {
-          const value = unwrap(await remote.brief(sessionId, bookPicked ? { book: bookPicked } : {}))
-          setBrief({ phase: 'ready', data: value, error: null })
-        } catch (error) {
-          setBrief({ phase: 'error', data: null, error: String(error?.message ?? error) })
-        }
-      }
-
-      const go = (next, nextKind, selectedId) => {
-        setSection(next)
-        if (nextKind) setKind(nextKind)
-        if (selectedId) setSelected(selectedId)
-      }
-
-      const locateSource = (card) => {
-        setSourceCursor({ chapter: card.chapter, query: card.quote || '' })
-        setSection('source')
-      }
-
-      const healthAction = (action) => {
-        if (!action) return
-        if (action.kind === 'brief') {
-          setSection('overview')
-          return
-        }
-        setSection('cards')
-        setKind('events')
-        if (Number.isInteger(action.chapter) && action.chapter > 0) setChapterFilter(action.chapter)
-        if (action.kind === 'card' && action.cardId) setSelected(action.cardId)
-      }
-
-      const clearFilter = () => {
+      const clearFilters = () => {
         setQuery('')
         setDebounced('')
         setChapterFilter(null)
-        setEntityFilter(null)
-        setPlaceFilter(null)
+        setPinnedOnly(false)
         setFadedOnly(false)
         setFiltered(null)
       }
 
+      const openPerson = (name) => {
+        if (!name) return
+        setSheet({ type: 'character', name })
+      }
+
+      const openSource = (chapter, search = '') => {
+        setSheet({ type: 'source', chapter, query: search })
+      }
+
+      const loadSource = async (chapter, search = sourceQuery) => {
+        if (!remote || !sessionId || !chapter) return
+        const mine = ++sourceSeq.current
+        setSourceChapter(chapter)
+        setSourceBusy(true)
+        setSourceResult(null)
+        try {
+          const value = unwrap(await remote.sourceSlice(sessionId, {
+            book,
+            chapter,
+            query: String(search ?? '').trim(),
+          }))
+          if (mine !== sourceSeq.current) return
+          setSourceResult(value)
+        } catch (error) {
+          if (mine !== sourceSeq.current) return
+          setSourceResult({ ok: false, message: String(error?.message ?? error) })
+        } finally {
+          if (mine === sourceSeq.current) setSourceBusy(false)
+        }
+      }
+
+      const loadArtifact = async (verify) => {
+        if (!remote || !sessionId || !artifactInput.trim()) return
+        const mine = ++artifactSeq.current
+        setArtifactBusy(true)
+        try {
+          const value = unwrap(await remote.artifact(sessionId, {
+            book,
+            artifactId: artifactInput.trim(),
+            verify: verify === true,
+          }))
+          if (mine !== artifactSeq.current) return
+          setArtifactResult(value)
+        } catch (error) {
+          if (mine !== artifactSeq.current) return
+          setArtifactResult({ found: false, message: String(error?.message ?? error) })
+        } finally {
+          if (mine === artifactSeq.current) setArtifactBusy(false)
+        }
+      }
+
+      const healthAction = (action) => {
+        if (!action) return
+        if (action.kind === 'brief') { setSheet({ type: 'brief' }); return }
+        if (action.cardId) {
+          const card = (snapshot?.cards ?? []).find((item) => item.id === action.cardId)
+          if (card) { setSheet({ type: 'card', card }); return }
+        }
+        if (Number.isInteger(action.chapter) && action.chapter > 0) {
+          setTab('memory')
+          setMemoryView('cards')
+          setChapterFilter(action.chapter)
+          setSheet(null)
+        }
+      }
+
+      const navTabs = [
+        ['overview', '总览'],
+        ['memory', '记忆'],
+        ['provenance', '溯源'],
+      ]
+      const healthCounts = snapshot?.health?.counts ?? {}
+      const healthTotal = (healthCounts.block ?? 0) + (healthCounts.warn ?? 0)
+
       const header = h('div', { className: 'fade-head' },
         h('div', { className: 'fade-title-row' },
-          h(Mark),
+          h('div', { className: 'fade-brand' }, h(Icon, { name: 'brand' })),
           h('span', { className: 'fade-title' }, '长篇记忆'),
-          mode == null ? null : h('button', {
-            type: 'button', className: 'fade-chip', 'data-a': mode ? '1' : '0',
-            style: mode ? {
-              height: 18, fontSize: 9.5,
-              color: T.ok,
-              borderColor: `color-mix(in srgb, ${T.ok} 45%, transparent)`,
-              background: `color-mix(in srgb, ${T.ok} 12%, transparent)`,
-            } : { height: 18, fontSize: 9.5 },
-            onClick: toggleMode,
+          h('button', {
+            type: 'button', className: 'fade-switch', 'data-on': mode === false ? '0' : '1',
+            onClick: toggleMode, 'aria-label': mode ? '关闭褪色记忆' : '开启褪色记忆',
             title: '切换 /memo on | off',
-          }, mode ? '开' : '关'),
-          snapshot?.revision != null
-            ? h('span', {
-              className: 'fade-chip',
-              style: { height: 18, fontSize: 9.5, color: T.muted },
-              title: '记忆版本',
-            }, `v${snapshot.revision}`)
-            : null,
+          }),
+          h('span', { className: 'fade-switch-label' }, mode == null ? '…' : mode ? '开' : '关'),
+          snapshot?.revision != null ? h('span', { className: 'fade-ver' }, `v${snapshot.revision}`) : null,
           h('div', { className: 'fade-grow' }),
           h('button', {
-            type: 'button', className: 'fade-chip', onClick: () => { clearFilter(); panel.reload() },
-            title: '重新读取快照',
-          }, '↻')),
-        snapshot
-          ? h('div', { className: 'fade-sub' },
-            (snapshot.books?.length ?? 0) > 1
-              ? h('select', {
-                className: 'fade-select',
-                value: snapshot.book ?? '',
-                onChange: (event) => switchBook(event.target.value),
-                title: `这个工作区有 ${snapshot.books.length} 本书`,
-              }, snapshot.books.map((entry) => h('option', {
-                key: entry.book, value: entry.book,
-              }, entry.title || entry.book)))
-              : h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis' } }, snapshot.title ?? snapshot.book ?? ''),
-            h('span', null, '·'),
-            h('span', { className: 'fade-num' }, `第 ${snapshot.chapter} 章`),
-            snapshot.book && snapshot.book !== snapshot.title && (snapshot.books?.length ?? 0) <= 1
-              ? h('span', null, `· ${snapshot.book}`)
-              : null)
-          : null)
+            type: 'button', className: 'fade-iconbtn', 'aria-label': '协作状态',
+            onClick: () => setSheet({ type: 'companions' }),
+          }, h(Icon, { name: 'more' })),
+          h('button', {
+            type: 'button', className: 'fade-iconbtn', 'aria-label': '刷新',
+            onClick: () => { clearFilters(); panel.reload() },
+          }, h(Icon, { name: 'refresh' }))),
+        h('div', { className: 'fade-bookrow' },
+          snapshot && (snapshot.books?.length ?? 0) > 1
+            ? h('select', {
+              className: 'fade-select', value: snapshot.book ?? '', onChange: (event) => switchBook(event.target.value),
+              'aria-label': '切换书',
+            }, snapshot.books.map((entry) => h('option', { key: entry.book, value: entry.book }, entry.title || entry.book)))
+            : h('button', {
+              type: 'button', className: 'fade-book',
+              onClick: () => { if (snapshot?.books?.length > 1) setSheet({ type: 'books' }) },
+              title: snapshot?.title ?? snapshot?.book ?? '',
+            }, h('b', null, snapshot?.title ?? snapshot?.book ?? '正在读取…'), snapshot?.books?.length > 1 ? h(Icon, { name: 'chevron', size: 10 }) : null),
+          snapshot?.chapter ? h('span', { className: 'fade-chap' }, `第 ${snapshot.chapter} 章`) : null,
+          snapshot?.health
+            ? h('button', {
+              type: 'button', className: 'fade-healthpill', 'data-ok': healthTotal ? '0' : '1',
+              onClick: () => setTab('overview'),
+              title: '看本章体检',
+            }, h('i', { className: 'fade-dot' }), healthTotal ? `${healthTotal} 项` : '通过')
+            : null),
+        h('div', { className: 'fade-nav' },
+          navTabs.map(([id, label]) => h('button', {
+            key: id, type: 'button', className: 'fade-tab', 'data-a': tab === id ? '1' : '0',
+            onClick: () => { setTab(id); setSheet(null) },
+          }, label)),
+          h('button', {
+            type: 'button', className: 'fade-cta', onClick: () => setSheet({ type: 'brief' }),
+            title: '生成下一章简报',
+          }, h(Icon, { name: 'spark', size: 11 }), '本章简报')))
 
       let body = null
       if (panel.phase === 'loading' && !snapshot) body = h(Loading, { label: '读取记忆…' })
       else if (panel.phase === 'error' && !snapshot) body = h(ErrorBox, { error: panel.error, onRetry: panel.reload })
-      else if (!snapshot) body = h(Empty, null, '还没有数据。')
+      else if (!snapshot) body = h(Empty, { title: '还没有数据' }, '检查当前工作区是否已 /memo on。')
       else if (snapshot.exists === false) {
-        body = h(Empty, null,
-          h('div', null, snapshot.message ?? '这个工作区还没有 fade 记忆。'),
-          h('div', { style: { marginTop: 10 } },
-            h('button', { type: 'button', className: 'fade-btn', onClick: panel.reload }, '重新检查')))
-      } else if (section === 'overview') {
+        body = h(Empty, { title: '这个工作区还没有 fade 记忆' }, snapshot.message ?? '先 /memo on，写完一章跑 memo_digest。')
+      } else if (tab === 'overview') {
         body = h(Overview, {
-          snapshot, mode, onToggleMode: toggleMode, onGo: go, onBrief: generateBrief, brief,
-          onFaded: () => { setFadedOnly(true); setKind('events'); setSection('cards') },
+          snapshot,
+          onPerson: openPerson,
+          onSearch: () => { setTab('memory'); setMemoryView('cards'); setTimeout(() => searchRef.current?.focus(), 30) },
+          onSource: () => { setTab('provenance'); setProvenanceView('source') },
+          onProvenance: () => { setTab('provenance'); setProvenanceView('timeline') },
+          onBrief: () => setSheet({ type: 'brief' }),
+          onSeries: () => setSheet({ type: 'companions' }),
           onHealthAction: healthAction,
         })
-      } else if (section === 'cards') {
-        body = h(CardsSection, {
-          snapshot, kind, onKind: setKind, query, onQuery: setQuery, selected,
-          onSelect: (id) => { setSelected(id); if (id) setChapterOpen(null) },
-          chapter: snapshot.chapter,
-          onChapter: (chapterNumber) => {
-            setKind('events')
-            setChapterFilter((prev) => (prev === chapterNumber ? null : chapterNumber))
-          },
-          onLocateSource: locateSource,
-          cards, total: totalCards, hasMore: totalCards > cards.length, onMore: loadMore,
-          loadingMore: moreBusy, chapterFilter, onClearChapter: () => setChapterFilter(null),
-          entityFilter, placeFilter,
-          onEntity: (name) => { setEntityFilter(name ?? null); if (name) setKind('events') },
-          onPlace: (name) => { setPlaceFilter(name ?? null); if (name) setKind('events') },
-          remote, sessionId, book: snapshot?.book ?? null,
-          chapterOpen,
-          onOpenChapter: (value) => {
-            setChapterOpen(value ?? null)
-            if (value) { setSelected(null); setKind('chapters') }
-          },
-          onCloseChapter: () => setChapterOpen(null),
-          onChapterCards: (chapterNumber) => {
-            setKind('events')
-            setChapterFilter(chapterNumber)
-            setChapterOpen(null)
-          },
-          fadedOnly,
-          onFaded: () => { setFadedOnly((prev) => !prev); setKind('events') },
-          fadedCount: (snapshot.overview?.cards?.distribution?.gist ?? 0) + (snapshot.overview?.cards?.distribution?.feeling ?? 0),
-          cachedChapters: snapshot?.overview?.source?.list ?? [],
+      } else if (tab === 'memory') {
+        body = h(MemoryPane, {
+          snapshot, cards, total: totalCards, hasMore, onMore: loadMore, loadingMore: moreBusy,
+          people: snapshot.people ?? [],
+          query, onQuery: setQuery, searchRef, onSearchFocus: () => {},
+          pinnedOnly, onPinned: setPinnedOnly, fadedOnly, onFaded: setFadedOnly,
+          view: memoryView, onView: setMemoryView, onCard: (card) => setSheet({ type: 'card', card }),
+          onPerson: openPerson, chapterFilter, onClearChapter: () => setChapterFilter(null),
         })
-      } else if (section === 'curve') {
-        body = h(CurveSection, { curve, series: curveSeries, onSeries: setCurveSeries, width: width - 60 })
       } else {
-        body = h(SourceSection, {
-          index: sourceIndex, remote, sessionId, inline: sourceCursor,
-          fadedChapters: (snapshot.chapters ?? []).filter((row) => row.faded > 0),
-          book: bookPicked ?? snapshot?.book ?? null,
+        body = h(ProvenancePane, {
+          view: provenanceView, onView: setProvenanceView,
+          timeline: timeline.data, timelineData: timeline, timelineFilter, onTimelineFilter: setTimelineFilter,
+          onTimelineEntry: (entry) => {
+            if (entry.chapter) {
+              setTab('memory'); setMemoryView('cards'); setChapterFilter(entry.chapter); setSheet(null)
+            }
+          },
+          sourceIndex: sourceIndex.data, sourceChapter,
+          onSourceChapter: (chapter) => { setSourceChapter(chapter); loadSource(chapter, sourceQuery) },
+          sourceQuery, onSourceQuery: setSourceQuery,
+          onLoadSource: (chapter) => loadSource(chapter, sourceQuery),
+          sourceResult, sourceBusy,
+          artifactInput, onArtifactInput: setArtifactInput, artifactResult, artifactBusy, onArtifact: loadArtifact,
         })
       }
 
-      return h('div', { className: 'fade-root', ref: rootRef, 'data-scheme': scheme },
-        h(Styles),
-        header,
-        h('div', { className: 'fade-tabs' }, SECTIONS.map(([id, label]) => h('button', {
-          key: id, type: 'button', className: 'fade-tab', 'data-a': section === id ? '1' : '0',
-          onClick: () => setSection(id),
-        }, label))),
-        h('div', { className: 'fade-body' }, body),
-        h('div', { className: 'fade-foot' },
-          h('span', null, snapshot?.revision != null
-            ? `记忆 v${snapshot.revision} · 快照 ${snapshot.generatedAt ? new Date(snapshot.generatedAt).toLocaleTimeString('zh-CN', { hour12: false }) : '未加载'}`
-            : (snapshot?.generatedAt ? `快照 ${new Date(snapshot.generatedAt).toLocaleTimeString('zh-CN', { hour12: false })}` : '未加载')),
-          h('span', null, `${(snapshot?.warnings ?? []).length} 条提示`)))
+      const sheetBook = snapshot?.book ?? book
+      const sheetSheet = sheet
+        ? sheet.type === 'brief'
+          ? h(BriefSheet, {
+            remote, sessionId, book: sheetBook, chapter: snapshot?.chapter ?? 1,
+            people: snapshot?.people ?? [], onClose: () => setSheet(null),
+          })
+          : sheet.type === 'card'
+            ? h(CardSheet, {
+              card: sheet.card, chapter: snapshot?.chapter ?? sheet.card.chapter,
+              sourceChapters: snapshot?.overview?.source?.list ?? [],
+              onLocate: (card) => openSource(card.chapter, card.quote ?? ''),
+              onEntity: (name) => openPerson(name),
+              onClose: () => setSheet(null),
+            })
+            : sheet.type === 'character'
+              ? h(CharacterSheet, {
+                remote, sessionId, book: sheetBook, name: sheet.name, onClose: () => setSheet(null),
+              })
+              : sheet.type === 'source'
+                ? h(SourceSheet, {
+                  remote, sessionId, book: sheetBook, chapter: sheet.chapter, query: sheet.query ?? '',
+                  onClose: () => setSheet(null),
+                })
+                : sheet.type === 'companions'
+                  ? h(CompanionsSheet, { companions: snapshot?.companions, onClose: () => setSheet(null) })
+                  : sheet.type === 'books'
+                    ? h(Sheet, { title: '切换书', subtitle: '同一工作区', onClose: () => setSheet(null) },
+                      h('div', { className: 'fade-menu' }, (snapshot?.books ?? []).map((entry) => h('button', {
+                        key: entry.book, type: 'button', onClick: () => { switchBook(entry.book); setSheet(null) },
+                      }, h('div', null, entry.title || entry.book, h('small', null, `${entry.chapters} 章 · ${entry.cards} 张卡`))))))
+                    : null
+        : null
+
+      return h('div', {
+        className: 'fade-root', ref: rootRef, 'data-scheme': scheme,
+      },
+      h(Styles),
+      header,
+      h('div', { className: 'fade-body' }, body),
+      h('div', { className: 'fade-foot' },
+        h('span', null, snapshot?.revision != null
+          ? `记忆 v${snapshot.revision} · 快照 ${clock(snapshot.generatedAt)}`
+          : (snapshot?.generatedAt ? `快照 ${clock(snapshot.generatedAt)}` : '未加载')),
+        h('span', null, `${(snapshot?.warnings ?? []).length} 条提示 · 只读`)),
+      sheetSheet)
     }
 
+    /* ════════════════════════════════════════════════════════════════════════
+     * 9. Sheets
+     * ════════════════════════════════════════════════════════════════════════ */
+    function copyText(text) {
+      const value = String(text ?? '')
+      try {
+        if (navigator?.clipboard?.writeText) return navigator.clipboard.writeText(value)
+      } catch { /* fall through */ }
+      try {
+        const area = document.createElement('textarea')
+        area.value = value
+        area.style.cssText = 'position:fixed;left:-9999px;top:0'
+        document.body.appendChild(area)
+        area.select()
+        document.execCommand('copy')
+        area.remove()
+        return Promise.resolve()
+      } catch {
+        return Promise.reject(new Error('复制失败'))
+      }
+    }
+
+    function downloadText(filename, text) {
+      try {
+        const blob = new Blob([String(text ?? '')], { type: 'text/markdown;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+      } catch (error) {
+        console.error('[novel-fade] 导出失败', error)
+      }
+    }
+
+    function parseBriefSections(markdown) {
+      const text = String(markdown ?? '')
+      const sections = []
+      let current = null
+      for (const line of text.split('\n')) {
+        if (line.startsWith('## ')) {
+          current = { title: line.slice(3).trim(), body: [] }
+          sections.push(current)
+        } else if (current && line.trim()) {
+          current.body.push(line)
+        }
+      }
+      return sections.map((section) => ({ title: section.title, body: section.body.join('\n') }))
+    }
+
+    function BriefSheet({ remote, sessionId, book, chapter, people, onClose }) {
+      const [target, setTarget] = React.useState(Math.max(1, Number(chapter) || 1))
+      const [mode, setMode] = React.useState('chapter')
+      const [budget, setBudget] = React.useState(1400)
+      const [cast, setCast] = React.useState([])
+      const [location, setLocation] = React.useState('')
+      const [propsText, setPropsText] = React.useState('')
+      const [state, setState] = React.useState({ phase: 'loading', data: null, error: null })
+      const [openIds, setOpenIds] = React.useState(() => new Set(['hard', 'threads']))
+      const [notice, setNotice] = React.useState('')
+      const requestSeq = React.useRef(0)
+
+      React.useEffect(() => {
+        const next = Number(chapter)
+        if (Number.isInteger(next) && next > 0) setTarget(next)
+      }, [chapter])
+
+      const castKey = cast.join('|')
+      const load = React.useCallback(async () => {
+        if (!remote || !sessionId) return
+        const mine = ++requestSeq.current
+        setState({ phase: 'loading', data: null, error: null })
+        try {
+          const options = {
+            book, chapter: target, mode, budget,
+            scene: {
+              entities: cast,
+              location: location.trim(),
+              props: parseNames(propsText),
+            },
+          }
+          const value = unwrap(await remote.brief(sessionId, options))
+          if (mine !== requestSeq.current) return
+          setState({ phase: 'ready', data: value, error: null })
+        } catch (error) {
+          if (mine !== requestSeq.current) return
+          setState({ phase: 'error', data: null, error: String(error?.message ?? error) })
+        }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [remote, sessionId, book, target, mode, budget, castKey, location, propsText])
+
+      React.useEffect(() => {
+        setState({ phase: 'loading', data: null, error: null })
+        const id = setTimeout(load, 240)
+        return () => {
+          clearTimeout(id)
+          requestSeq.current += 1
+        }
+      }, [load])
+
+      const data = state.data
+      const limit = mode === 'handoff' ? 2600 : 1800
+      const sections = parseBriefSections(data?.markdown)
+      const byTitle = new Map(sections.map((section) => [section.title, section]))
+      const breakdown = (data?.breakdown ?? []).filter((section) => section.included)
+      const budgetValue = Math.min(budget, limit)
+      const setPreset = (value) => {
+        if (value === 2200) {
+          setMode('handoff')
+          setBudget(2200)
+          return
+        }
+        setBudget(value)
+      }
+      const toggleCast = (name) => {
+        setCast((prev) => prev.includes(name) ? prev.filter((item) => item !== name) : prev.concat(name))
+      }
+      const toggleSection = (id) => {
+        setOpenIds((prev) => {
+          const next = new Set(prev)
+          if (next.has(id)) next.delete(id)
+          else next.add(id)
+          return next
+        })
+      }
+      const copy = async () => {
+        try {
+          await copyText(data?.markdown ?? '')
+          setNotice('已复制到剪贴板')
+          setTimeout(() => setNotice(''), 1800)
+        } catch {
+          setNotice('复制失败，请换浏览器重试')
+        }
+      }
+
+      return h(Sheet, {
+        title: '本章简报',
+        subtitle: `第 ${target} 章 · 只读预览`,
+        onClose,
+        footer: h(React.Fragment, null,
+          h('div', { className: 'fade-sheet-note' },
+            '只生成上下文，不写入记忆。',
+            notice ? h('div', { style: { color: 'var(--fade-ok)', marginTop: 2 } }, notice) : null),
+          h(Btn, { disabled: !data?.markdown, onClick: () => downloadText(`第${target}章-褪色简报.md`, data?.markdown ?? '') }, '导出 .md'),
+          h(Btn, { primary: true, onClick: copy, disabled: !data?.markdown }, '复制简报')),
+      },
+      h('div', { className: 'fade-field' },
+        h('span', { className: 'fade-flabel' }, '目标章'),
+        h('div', { className: 'fade-stepper' },
+          h('button', { type: 'button', onClick: () => setTarget((value) => Math.max(1, value - 1)), 'aria-label': '上一章' }, '−'),
+          h('b', null, `第 ${target} 章`),
+          h('button', { type: 'button', onClick: () => setTarget((value) => Math.min(9999, value + 1)), 'aria-label': '下一章' }, '＋')),
+        h('span', { className: 'fade-flabel', style: { width: 'auto', marginLeft: 'auto' } }, '模式'),
+        h('div', { className: 'fade-preset', style: { flex: '0 0 92px' } },
+          h('button', { type: 'button', 'data-a': mode === 'chapter' ? '1' : '0', onClick: () => { setMode('chapter'); setBudget((value) => Math.min(value, 1800)) } }, '本章'),
+          h('button', { type: 'button', 'data-a': mode === 'handoff' ? '1' : '0', onClick: () => setMode('handoff') }, '交接'))),
+      h('div', { className: 'fade-field' },
+        h('span', { className: 'fade-flabel' }, '预算'),
+        h('div', { className: 'fade-preset' },
+          [1000, 1400, 2200].map((value) => h('button', {
+            key: value, type: 'button', 'data-a': budget === value ? '1' : '0',
+            onClick: () => setPreset(value),
+          }, String(value))))),
+      h('div', { className: 'fade-field' },
+        h('span', { className: 'fade-flabel' }, '细调'),
+        h('div', { className: 'fade-range' },
+          h('input', {
+            type: 'range', min: 300, max: limit, step: 100, value: budgetValue,
+            onChange: (event) => setBudget(Number(event.target.value)),
+            'aria-label': '简报预算',
+          })),
+        h('span', { className: 'fade-range-num' }, `${budgetValue} 字`)),
+      budget > limit
+        ? h('div', { className: 'fade-sub' }, `普通模式上限 ${limit} 字；想要 ${budget} 字请切「交接」模式。`)
+        : null,
+      h('div', { className: 'fade-field', style: { alignItems: 'flex-start' } },
+        h('span', { className: 'fade-flabel', style: { marginTop: 4 } }, '在场'),
+        h('div', { className: 'fade-cast' },
+          people.slice(0, 8).map((person) => h('button', {
+            key: person.id, type: 'button', 'data-a': cast.includes(person.name) ? '1' : '0',
+            onClick: () => toggleCast(person.name),
+          }, person.name)),
+          h('span', { className: 'fade-sub', style: { alignSelf: 'center' } }, '不选则不收窄'))),
+      h('div', { className: 'fade-field' },
+        h('span', { className: 'fade-flabel' }, '地点'),
+        h('input', {
+          className: 'fade-input', value: location, placeholder: '冰火两仪眼废墟',
+          onChange: (event) => setLocation(event.target.value),
+        })),
+      h('div', { className: 'fade-field' },
+        h('span', { className: 'fade-flabel' }, '道具'),
+        h('input', {
+          className: 'fade-input', value: propsText, placeholder: '钥匙、铁护腕（用顿号分隔）',
+          onChange: (event) => setPropsText(event.target.value),
+        })),
+      state.phase === 'error' ? h(ErrorBox, { error: state.error, onRetry: load }) : null,
+      state.phase === 'loading' && !data ? h(Loading, { label: '生成简报…' }) : null,
+      data
+        ? h(React.Fragment, null,
+          h('div', { className: 'fade-sum' },
+            h('span', null,
+              h('b', null, `${breakdown.length} 段`), ` · ${fmt(data.chars)} 字 · 预算 ${fmt(data.budget)}`,
+              data.budgetLimit && data.budgetLimit !== data.budget ? `（上限 ${data.budgetLimit}）` : ''),
+            h('span', { className: 'ok' },
+              data.sources?.l0Omitted ? `L0 ${data.sources.l0Included}/${data.sources.l0Total}` : `L0 ${data.sources?.l0Total ?? 0} 张全部进入`)),
+          data.overBudget
+            ? h('div', { className: 'fade-stale' }, h(Icon, { name: 'alert', size: 13 }), h('span', null, `超出预算 ${fmt(data.chars - data.budget)} 字；硬契约段不会被裁，只能裁后面的段。`))
+            : null,
+          data.sources?.partial
+            ? h('div', { className: 'fade-sub' }, '有段落被裁剪；来源只统计实际进入正文的卡。')
+            : null,
+          breakdown.map((section) => {
+            const body = byTitle.get(section.title)
+            const open = openIds.has(section.id)
+            return h('div', { key: section.id, className: 'fade-srow' },
+              h('button', {
+                type: 'button', style: { border: 0, background: 'transparent', padding: 0, width: '100%', cursor: 'pointer', color: 'inherit' },
+                onClick: () => toggleSection(section.id),
+              },
+              h('div', { className: 'fade-srow-h' },
+                h('b', null, section.title),
+                section.clipped ? h('span', { className: 'clip' }, section.omitted ? `裁 ${section.omitted} 张` : '已裁') : null,
+                h('span', { className: 'count' }, `${section.chars} 字`)),
+              h('div', { className: `fade-srow-bar ${section.clipped ? 'warn' : ''}` },
+                h('i', { style: { width: `${Math.min(100, section.budget ? (section.chars / section.budget) * 100 : 30)}%` } }))),
+              open && body
+                ? h('div', { className: 'fade-srow-body' }, body.body)
+                : null)
+          }),
+          data.sources
+            ? h('div', { className: 'fade-sub', style: { marginTop: 2 } },
+              `来源 L0 ${data.sources.l0Included ?? 0} · L1 ${data.sources.cardIds?.length ?? 0} · 章节 ${(data.sources.chapters ?? []).length}`)
+            : null)
+        : null)
+    }
+
+    function CardSheet({ card, chapter, sourceChapters, onLocate, onEntity, onClose }) {
+      const cached = Array.isArray(sourceChapters) && sourceChapters.includes(card.chapter)
+      return h(Sheet, {
+        title: '记忆卡',
+        subtitle: `第 ${card.chapter} 章 · ${card.layer}`,
+        onClose,
+        footer: h(React.Fragment, null,
+          h('div', { className: 'fade-sheet-note' }, '面板只读；钉住/遗忘请让 agent 调 memo_pin / memo_forget。'),
+          h(Btn, { primary: true, onClick: () => onLocate(card) }, cached ? '回查原句' : '按需取原文')),
+      },
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' } },
+        h(Tag, { tone: card.permission === 'precise' ? 'ok' : card.permission === 'recall' ? 'warn' : '' }, card.permissionLabel),
+        card.pinned ? h('span', { className: 'fade-pin' }, h(Icon, { name: 'pin', size: 11 }), '作者钉住') : null),
+      h('div', { style: { fontSize: 16, fontWeight: 650, lineHeight: 1.4 } }, card.topic),
+      card.gist ? h('div', { style: { fontSize: 12, lineHeight: 1.7, color: 'var(--fade-text)' } }, card.gist) : null,
+      card.gist === '' && card.permission !== 'precise' && card.permission !== 'recall'
+        ? h('div', { className: 'fade-sub' }, '这张卡已经褪色：只保留主题与情绪，不补细节。')
+        : null,
+      card.quote ? h('div', { className: 'fade-quote', style: { borderLeft: '2px solid var(--fade-line-2)', paddingLeft: 9, color: 'var(--fade-muted)', fontSize: 11, lineHeight: 1.7 } }, `锚句「${card.quote}」`) : null,
+      h('dl', { className: 'fade-artifact-row', style: { marginTop: 4 } },
+        h('dt', null, '三维'), h('dd', { className: 'fade-num' }, `熟 ${card.familiarity} · 可及 ${card.accessibility} · 保真 ${card.fidelity}`),
+        card.entityNames?.length ? h('dt', null, '人物') : null,
+        card.entityNames?.length ? h('dd', null, card.entityNames.map((name) => h('button', {
+          key: name, type: 'button', className: 'fade-link', style: { marginRight: 8, marginTop: 0 }, onClick: () => onEntity?.(name),
+        }, name))) : null,
+        card.placeName ? h('dt', null, '地点') : null,
+        card.placeName ? h('dd', null, card.placeName) : null,
+        card.pinnedReason ? h('dt', null, '钉住原因') : null,
+        card.pinnedReason ? h('dd', null, card.pinnedReason) : null),
+      h('div', { className: 'fade-sub' }, cached ? '这一章原文已存；定位时会校验 sha。' : '这一章还没有原文缓存；先 memo_ingest（只存不用）。'))
+    }
+
+    function CharacterSheet({ remote, sessionId, book, name, onClose }) {
+      const detail = useCharacter(remote, sessionId, book, name, true)
+      const data = detail.data
+      return h(Sheet, {
+        title: name || '人物记忆',
+        subtitle: '只读聚合 · 不是人物档案',
+        onClose,
+        footer: h('div', { className: 'fade-sheet-note' }, '不生成新事实；没有卡不等于没出场。'),
+      },
+      detail.phase === 'loading' ? h(Loading, { label: '聚合人物记忆…' }) : null,
+      detail.phase === 'error' ? h(ErrorBox, { error: detail.error, onRetry: detail.reload }) : null,
+      data && data.found === false ? h(Empty, { title: '记忆里没有这个人物' }, data.message ?? '可以先用 memo_recall 搜一下名字。') : null,
+      data && data.found
+        ? h(React.Fragment, null,
+          h('div', { className: 'fade-card' },
+            h('div', { style: { display: 'flex', alignItems: 'baseline', gap: 8 } },
+              h('div', { style: { fontSize: 18, fontWeight: 650 } }, data.entity?.name ?? data.name),
+              data.entity?.relationship ? h('span', { className: 'fade-sub' }, data.entity.relationship) : null),
+            data.entity?.aliases?.length
+              ? h('div', { className: 'fade-sub' }, `别名：${data.entity.aliases.join('、')}`)
+              : null,
+            h('div', { className: 'fade-sub', style: { marginTop: 5 } },
+              `出场 ${data.appearances ?? 0} 章 · ${(data.cards ?? []).length} 张卡${data.l0 ? ` · ${data.l0} 张 L0` : ''}`),
+            h('div', { className: 'fade-stale', style: { marginTop: 8 } },
+              h(Icon, { name: 'alert', size: 13 }),
+              h('span', null, data.coverage?.note ?? '当前记忆对这个人物的覆盖不完整。'))),
+          h('div', { className: 'fade-sec' }, h('h3', null, '按章记忆'), h('span', null, `${(data.cards ?? []).length} 张`)),
+          (data.cards ?? []).length
+            ? (data.cards ?? []).map((card) => h('div', { key: card.id, className: 'fade-mcard', style: { cursor: 'default' } },
+              h('div', { className: 'fade-mcard-h' },
+                h('span', null, `第 ${card.chapter} 章`),
+                h('span', { className: 'fade-layer', 'data-l0': card.layer === 'L0' ? '1' : '0' }, card.layer),
+                card.pinned ? h('span', { className: 'fade-pin' }, h(Icon, { name: 'pin', size: 10 })) : null),
+              h('div', { className: 'fade-mcard-t' }, card.topic),
+              card.gist ? h('div', { className: 'fade-mcard-s' }, card.gist) : null,
+              h('div', { className: 'fade-mcard-f' },
+                h('span', { className: 'fade-mini' }, card.permissionLabel),
+                card.quote ? h('span', { className: 'fade-mini' }, `锚句「${card.quote}」`) : null)))
+            : h(Empty, { title: '当前记忆中没有相关卡' }, '这不等于没出场；可以继续写，或补 digest。'))
+        : null)
+    }
+
+    function SourceSheet({ remote, sessionId, book, chapter, query, onClose }) {
+      const call = React.useCallback(async () => {
+        const value = unwrap(await remote.sourceSlice(sessionId, {
+          book, chapter, query: String(query ?? '').trim(),
+        }))
+        return value
+      }, [remote, sessionId, book, chapter, query])
+      const result = useRemoteCall(call, [call])
+      return h(Sheet, {
+        title: `原文 · 第 ${chapter} 章`,
+        subtitle: query ? '按锚句定位' : '按章读取',
+        onClose,
+        footer: h('div', { className: 'fade-sheet-note' }, '原文不是记忆；只用于核对，不要当摘要。'),
+      },
+      result.phase === 'loading' ? h(Loading, { label: '读原文…' }) : null,
+      result.phase === 'error' ? h(ErrorBox, { error: result.error, onRetry: result.reload }) : null,
+      result.data ? h(SourceResult, { result: result.data }) : null)
+    }
+
+    function companionReason(row) {
+      if (!row) return '未加载'
+      if (row.reason === 'no-service') return '当前会话没有发现服务；可能未安装、未启用或版本过旧'
+      if (row.reason === 'capability-missing') return '服务在，但没有 fade 需要的能力'
+      if (row.reason === 'identity-failed') return '服务在，但 identity 读取失败'
+      if (row.reason === 'service-unavailable') return '服务没应答；本地账本仍可读'
+      return row.reason ?? ''
+    }
+
+    function CompanionsSheet({ companions, onClose }) {
+      const rows = [
+        ['beat', '事件账本', companions?.beat],
+        ['voice', '文风', companions?.voice],
+        ['fanfic', '同人', companions?.fanfic],
+        ['conductor', '编排', companions?.conductor],
+      ]
+      const stateLabel = (row) => {
+        if (!row) return '未加载'
+        if (row.state === 'available') return '可用'
+        if (row.state === 'adapted') return '已适配'
+        if (row.state === 'unknown') return '状态未知'
+        return '未发现'
+      }
+      const tone = (row) => row?.state === 'available' ? 'var(--fade-ok)'
+        : row?.state === 'adapted' ? 'var(--fade-warn)'
+          : row?.state === 'unknown' ? 'var(--fade-muted)' : 'var(--fade-faint)'
+      return h(Sheet, {
+        title: '协作状态',
+        subtitle: '只读探测 · 不显示安装/启用',
+        onClose,
+        footer: h('div', { className: 'fade-sheet-note' }, 'fade 只读兄弟账本，不写入；缺席时自动降级。'),
+      },
+      h('div', { className: 'fade-card' },
+        h('div', { className: 'fade-sub', style: { marginBottom: 6 } }, '服务发现只能证明「能力可调用」，不能证明插件已安装或已启用。'),
+        rows.map(([key, label, row]) => h('div', { key, style: { padding: '8px 0', borderTop: '1px solid var(--fade-line)' } },
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: 7 } },
+            h('i', { className: 'fade-dot', style: { color: tone(row) } }),
+            h('b', { style: { fontSize: 11 } }, label),
+            h('span', { className: 'fade-meta' }, key),
+            h('span', { className: 'fade-grow' }),
+            h('span', { className: 'fade-sub', style: { color: tone(row) } }, stateLabel(row))),
+          h('div', { className: 'fade-sub', style: { marginTop: 3 } },
+            row?.version ? `v${row.version}` : '版本未知',
+            row?.via ? ` · via ${row.via}` : '',
+            row?.file?.status ? ` · 本地账本 ${row.file.status}` : ''),
+          h('div', { className: 'fade-sub', style: { color: 'var(--fade-faint)' } }, companionReason(row)),
+          row?.capabilities?.length
+            ? h('div', { className: 'fade-sub', style: { fontFamily: 'var(--fade-mono)', fontSize: 9, marginTop: 2 } }, row.capabilities.join(' · '))
+            : null))),
+      h('div', { className: 'fade-sub' }, '契约：adapter-contract v1 · service_version 1'))
+    }
+
+    /* __PART2D__ */
+
+
+
+
+    /* ════════════════════════════════════════════════════════════════════════
+     * 10. Plugin registration
+     * ════════════════════════════════════════════════════════════════════════ */
     function FadeOpenButton(props) {
       return h('button', {
         type: 'button',
-        title: '长篇记忆：人物 / 事件 / 章节 / 衰退曲线 / 原文',
+        title: '长篇记忆：总览 / 记忆 / 溯源 / 简报',
         onClick: props.open,
         style: {
           appearance: 'none',
-          border: `1px solid ${T.border}`,
+          border: '1px solid var(--fade-line, rgba(127,127,127,.24))',
           background: 'transparent',
-          color: T.muted,
-          borderRadius: 6,
-          padding: '2px 8px',
-          fontSize: 12,
+          color: 'var(--fade-muted, inherit)',
+          borderRadius: 7,
+          padding: '3px 9px',
+          fontSize: 11.5,
           lineHeight: '18px',
           cursor: 'pointer',
           fontFamily: 'inherit',
@@ -1359,9 +1724,6 @@ window.__ModuleLoader__.load({
       }, '长篇记忆')
     }
 
-    /* ════════════════════════════════════════════════════════════════════════
-     * 10. Plugin
-     * ════════════════════════════════════════════════════════════════════════ */
     const TAB_ID = 'dsh-novel-fade'
     const TAB_KIND = 'novel-fade'
     const TAB_TITLE = '长篇记忆'
@@ -1394,7 +1756,6 @@ window.__ModuleLoader__.load({
             return
           }
 
-          // 1) 页签类型 —— 打开时按 kind 找；id 是 body/title 槽位的 key。
           scoped.effect(() => tabs.register({
             id: TAB_ID,
             kind: TAB_KIND,
@@ -1405,17 +1766,15 @@ window.__ModuleLoader__.load({
               id: TAB_ID,
               order: 10,
               title: () => TAB_TITLE,
-              description: () => '人物 / 事件 / 章节记忆卡、衰退曲线、按需原文',
+              description: () => '总览 / 记忆 / 溯源；记忆检索、变更记录、原文与本章简报',
             }],
           }), 'novel-fade: tab type')
 
-          // 2) 页签主体
           scoped.effect(() => scoped.slots.inject('sidebar.right.pane.tab', () => scoped.slots.register(
             { name: 'sidebar.right.pane.tab', key: TAB_ID, inject: (sessionId) => ({ sessionId, remote }) },
             FadeTab,
           )), 'novel-fade: tab body')
 
-          // 3) 会话头入口
           scoped.effect(() => scoped.slots.inject('conversation.session.header.utilities', () => scoped.slots.register(
             {
               name: 'conversation.session.header.utilities',
@@ -1436,5 +1795,6 @@ window.__ModuleLoader__.load({
         })
       },
     }
+
   },
 })

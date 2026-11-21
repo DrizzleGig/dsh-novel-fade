@@ -13,7 +13,7 @@
   },
   "scripts": {
     "test": "node --test",
-    "check": "node --check index.js && node --check client.js && node --check lib/remote.js && node --check lib/remote-contract.js && node --check lib/panel.js && node --check lib/source.js && node scripts/check-surface.mjs",
+    "check": "node --check index.js && node --check client.js && node --check lib/remote.js && node --check lib/remote-contract.js && node --check lib/panel.js && node --check lib/source.js && node scripts/check-surface.mjs && node --check lib/tool-schema.mjs",
     "smoke": "node scripts/smoke-3ch.mjs",
     "quality": "node scripts/quality-eval.mjs",
     "quality:check": "node scripts/quality-eval.mjs --check",

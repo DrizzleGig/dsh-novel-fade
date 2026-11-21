@@ -1,3 +1,11 @@
+## 0.7.2 — 2026-11-21
+
+- 接管：`applyAgentMode` 改用 `effectiveOn`，订阅 `novel-conductor/drive` 重算本会话（含 deny restrict 的收放）。
+- `/memo status` 增故事总控说明。
+- 新增 `lib/tool-schema.mjs` + `test/tool-schema.test.mjs`（参数 schema 守卫）。
+
+
+
 ﻿# Changelog
 
 ## 0.7.1 — 2026-11-21 · 可追溯的协作与三入口工作台

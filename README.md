@@ -4,6 +4,14 @@
 [![license](https://img.shields.io/badge/license-MIT-blue)](https://github.com/DrizzleGig/dsh-novel-fade/blob/main/LICENSE)
 [![stars](https://img.shields.io/github/stars/DrizzleGig/dsh-novel-fade)](https://github.com/DrizzleGig/dsh-novel-fade/stargazers)
 
+## 本版本（v0.7.2，2026-11-21）
+
+- **装了故事总控时，开关由它决定**：总控关着 → `memo_*` 不可用（哪怕 `/memo on` 过）；总控开着 → 可用（哪怕没 `/memo on`）。没装故事总控时，照旧按 `/memo on|off`。
+- 接管时会**撤掉关闭时装的 deny restrict**，收回时按独立开关恢复；只改内存，不写书目录。
+- `/memo status` 会直接说「本会话开 / 关，/cue on 才对」。
+- 工具参数 schema 守卫进 `npm test`。
+
+
 ## 想用 AI 写长篇小说，却总担心它忘记前面的剧情？
 
 想用 AI 写几十万字、上百万字的长篇小说，却总担心 AI 忘记前面的剧情、人物和伏笔？每次都把大量旧章节塞进上下文，不仅费钱，还会挤占真正用于创作的空间。

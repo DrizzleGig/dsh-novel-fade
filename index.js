@@ -1,4 +1,4 @@
-/**
+﻿/**
  * dsh-novel-fade — 有损记忆 / 小说记忆插件（v0.7.1）
  *
  * 独立运行：不 import beat，不调用 beat 工具。
@@ -78,6 +78,16 @@ const SKILL = {
   ].join('\n'),
 }
 
+/** 舞台监督接管：conductor 开着时，本会话也能用本插件（不改自己的开关与账本）。 */
+function conductorDriving(ctx, key) {
+  if (!key) return false
+  try {
+    const conductor = ctx.get?.('novelConductor')
+    return conductor?.isDriving?.(key) === true
+  } catch {
+    return false
+  }
+}
 function sessionKey(context) {
   return context?.agent?.id
     ?? context?.session?.agent?.id
@@ -141,7 +151,7 @@ export async function apply(ctx) {
 
   for (const definition of toolDefinitions()) {
     ctx.effect(() => ctx.tools.register(definition, {
-      when: (context) => modeCache.get(sessionKey(context)) === true,
+      when: (context) => modeCache.get(sessionKey(context)) === true || conductorDriving(ctx, sessionKey(context)),
     }))
   }
 

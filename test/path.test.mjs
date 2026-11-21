@@ -1,4 +1,4 @@
-import test from 'node:test'
+﻿import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -27,7 +27,7 @@ async function seed(cwd) {
 test('path: service rejects relative cwd instead of resolving against process.cwd', async (t) => {
   const cwd = await workspace(t)
   await seed(cwd)
-  const service = createFadeService({ version: '0.7.1', ctx: null })
+  const service = createFadeService({ version: '0.7.2', ctx: null })
   await assert.rejects(() => service.getStatus({ cwd: '.', book: BOOK }), (error) => error.code === 'bad-dir')
   await assert.rejects(() => service.getArtifact({ cwd: 'relative', book: BOOK, artifactId: 'digest:ch1:v1' }), (error) => error.code === 'bad-dir')
   const absolute = await service.getStatus({ cwd, book: BOOK })
@@ -39,7 +39,7 @@ test('path: a 正文/ chapter directory still lifts to the workspace ledger', as
   await seed(cwd)
   const chapterDir = join(cwd, '正文')
   await mkdir(chapterDir, { recursive: true })
-  const service = createFadeService({ version: '0.7.1', ctx: null })
+  const service = createFadeService({ version: '0.7.2', ctx: null })
   const brief = await service.getBrief({ cwd: chapterDir, book: BOOK, chapter: 2 })
   assert.equal(brief.book, BOOK)
   assert.match(brief.markdown, /第 2 章/)
@@ -48,7 +48,7 @@ test('path: a 正文/ chapter directory still lifts to the workspace ledger', as
 test('path: getCompanions also rejects relative cwd', async (t) => {
   const cwd = await workspace(t)
   await seed(cwd)
-  const service = createFadeService({ version: '0.7.1', ctx: null })
+  const service = createFadeService({ version: '0.7.2', ctx: null })
   await assert.rejects(() => service.getCompanions({ cwd: 'relative', book: BOOK }), (error) => error.code === 'bad-dir')
   const absolute = await service.getCompanions({ cwd, book: BOOK })
   assert.equal(absolute.book, BOOK)

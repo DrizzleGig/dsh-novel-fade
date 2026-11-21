@@ -1,4 +1,4 @@
-import test from 'node:test'
+﻿import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -13,7 +13,7 @@ import { toolDefinitions } from '../lib/tools.js'
 
 const BOOK = '可回查产物测试'
 const TEXT = '林川走到枯井边，把钥匙放在石沿上。雨落在油纸伞上。他转身走进雨里。'
-const VERSION = '0.7.1'
+const VERSION = '0.7.2'
 
 async function workspace(t) {
   const cwd = await mkdtemp(join(tmpdir(), 'fade-artifact-'))

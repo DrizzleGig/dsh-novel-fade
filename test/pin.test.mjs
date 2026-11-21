@@ -1,4 +1,4 @@
-import test from 'node:test'
+﻿import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -141,7 +141,7 @@ test('pin: service getStatus reports pinned count', async (t) => {
   const cwd = await workspace(t)
   const { memory } = await seed(cwd)
   await tool('memo_pin').execute({ dir: cwd, book: BOOK, ids: [memory.cards[0].id] })
-  const service = createFadeService({ version: '0.7.1', ctx: null })
+  const service = createFadeService({ version: '0.7.2', ctx: null })
   const status = await service.getStatus({ cwd, book: BOOK })
   assert.equal(status.pinned, 1)
 })

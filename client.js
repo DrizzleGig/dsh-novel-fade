@@ -248,6 +248,41 @@ window.__ModuleLoader__.load({
 .fade-spark i{width:5px;border-radius:2px;background:var(--fade-brand);opacity:.45}
 .fade-spark i:nth-child(2){background:#8fb4d9;opacity:.6}
 .fade-spark i:nth-child(3){background:var(--fade-ok);opacity:.55}
+.fade-curve-card{padding:11px 12px 10px;background:linear-gradient(180deg,color-mix(in srgb,var(--fade-brand) 7%,var(--fade-surface)),var(--fade-surface));border-color:color-mix(in srgb,var(--fade-brand) 20%,var(--fade-line));cursor:pointer;text-align:left;width:100%;font-family:inherit;color:inherit}
+.fade-curve-card:hover{border-color:color-mix(in srgb,var(--fade-brand) 36%,var(--fade-line))}
+.fade-curve-top{display:flex;align-items:flex-start;gap:8px}
+.fade-curve-kicker{font-size:9px;letter-spacing:.12em;color:var(--fade-brand);font-family:var(--fade-mono)}
+.fade-curve-title{font-size:13px;font-weight:650;margin-top:1px}
+.fade-curve-sub{font-size:9.5px;color:var(--fade-muted);margin-top:2px;line-height:1.45}
+.fade-curve-score{margin-left:auto;text-align:right;font-family:var(--fade-mono);flex:none}
+.fade-curve-score b{display:block;font-size:19px;line-height:1;color:var(--fade-text);font-weight:600}
+.fade-curve-score span{font-size:8.5px;color:var(--fade-faint)}
+.fade-curve-mini{height:58px;margin:5px -2px -3px;overflow:hidden;color:var(--fade-brand)}
+.fade-curve-mini svg{width:100%;height:58px;display:block}
+.fade-curve-foot{display:flex;align-items:center;gap:6px;margin-top:3px;font-size:9px;color:var(--fade-faint);font-family:var(--fade-mono)}
+.fade-curve-foot .warn{color:var(--fade-warn)}
+.fade-curve-foot .go{margin-left:auto;color:var(--fade-brand);font-family:inherit}
+.fade-curve-badge{font-size:8.5px;border:1px solid color-mix(in srgb,var(--fade-brand) 28%,var(--fade-line));border-radius:4px;padding:2px 4px;color:var(--fade-brand);font-family:var(--fade-mono)}
+.fade-cseg{display:flex;gap:2px;padding:2px;border:1px solid var(--fade-line);border-radius:7px;background:color-mix(in srgb,var(--fade-text) 4%,transparent);flex:none}
+.fade-cseg button{border:0;background:transparent;color:var(--fade-muted);font:9.5px var(--fade-mono);padding:3px 6px;border-radius:5px;cursor:pointer}
+.fade-cseg button[data-a="1"]{background:var(--fade-brand-soft);color:var(--fade-brand);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--fade-brand) 24%,transparent)}
+.fade-cfilters{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.fade-cfilter{border:1px solid var(--fade-line);background:var(--fade-surface);color:var(--fade-muted);border-radius:99px;font:9px var(--fade-mono);padding:3px 7px;cursor:pointer}
+.fade-cfilter[data-a="1"]{border-color:color-mix(in srgb,var(--fade-brand) 34%,var(--fade-line));color:var(--fade-brand);background:var(--fade-brand-soft)}
+.fade-curve-hero{background:var(--fade-surface);border:1px solid var(--fade-line);border-radius:11px;padding:10px 11px}
+.fade-curve-hero svg{display:block;width:100%;height:auto;max-height:230px;overflow:visible}
+.fade-curve-note{font-size:9px;color:var(--fade-faint);line-height:1.5;margin-top:5px;font-family:var(--fade-mono)}
+.fade-clegend{display:flex;flex-wrap:wrap;gap:5px 10px;margin-top:7px;font:9px var(--fade-mono);color:var(--fade-muted)}
+.fade-clegend span{display:inline-flex;align-items:center;gap:4px}
+.fade-clegend i{width:12px;height:2px;border-radius:2px;background:currentColor}
+.fade-marker-list{display:flex;flex-direction:column;gap:5px}
+.fade-marker{display:flex;align-items:center;gap:7px;border-top:1px solid var(--fade-line);padding-top:6px;font-size:10px;color:var(--fade-muted)}
+button.fade-marker{width:100%;border-left:0;border-right:0;border-bottom:0;background:transparent;text-align:left;cursor:pointer;font-family:inherit}
+button.fade-marker:hover{color:var(--fade-text)}
+.fade-marker:first-child{border-top:0;padding-top:0}
+.fade-marker b{font:9px var(--fade-mono);color:var(--fade-text);font-weight:500}
+.fade-marker .tag{margin-left:auto;font:8.5px var(--fade-mono);color:var(--fade-faint)}
+.fade-curve-empty{padding:18px 8px;text-align:center;color:var(--fade-faint);font-size:10px}
 .fade-series{display:flex;align-items:center;gap:5px;padding:8px 9px;border:1px dashed var(--fade-line-2);border-radius:8px;color:var(--fade-muted);font-size:9px;flex:none;flex-wrap:wrap}
 .fade-series .fade-dot{width:5px;height:5px}
 .fade-series .sep{color:var(--fade-faint)}
@@ -689,11 +724,62 @@ window.__ModuleLoader__.load({
         h('button', { type: 'button', className: 'more', onClick: onOpen }, '协作详情'))
     }
 
-    function Overview({ snapshot, onPerson, onSearch, onSource, onProvenance, onBrief, onSeries, onHealthAction }) {
+    function miniCurvePath(layer, width = 320, height = 56) {
+      const from = 1
+      const to = 120
+      const floor = Number(layer.floor) || 0
+      const h0 = layer.h0 == null ? null : Number(layer.h0)
+      const y = (value) => 4 + (1 - Math.max(0, Math.min(1, value))) * (height - 10)
+      const x = (chapter) => (chapter - from) / (to - from) * width
+      if (h0 == null) return `M0,${y(1)} L${width},${y(1)}`
+      const points = []
+      for (let index = 0; index <= 24; index += 1) {
+        const chapter = from + (to - from) * (index / 24)
+        const age = Math.max(0, chapter - 6)
+        const R = 2 ** (-age / h0)
+        points.push(`${x(chapter).toFixed(1)},${y(floor + (1 - floor) * R).toFixed(1)}`)
+      }
+      return `M${points.join(' L')}`
+    }
+
+    function CurveSummaryCard({ curve, onOpen }) {
+      if (!curve) return null
+      const layers = Array.isArray(curve.layers) ? curve.layers : []
+      const pathFor = (layer) => miniCurvePath(layer)
+      const legacy = curve.policy !== 'v4-basic'
+      return h('button', {
+        type: 'button', className: 'fade-card fade-curve-card', onClick: onOpen,
+        'aria-label': '打开记忆衰退曲线',
+      },
+      h('div', { className: 'fade-curve-top' },
+        h('div', null,
+          h('div', { className: 'fade-curve-kicker' }, 'RETENTION · V4 MODEL'),
+          h('div', { className: 'fade-curve-title' }, '记忆衰退曲线'),
+          h('div', { className: 'fade-curve-sub' }, `第 ${curve.chapter} 章 · 可用度 A · ${curve.eligible ?? 0} 张纳入`)),
+        h('div', { className: 'fade-curve-score' },
+          h('b', null, curve.A == null ? '—' : Number(curve.A).toFixed(2)),
+          h('span', null, 'median A'))),
+      h('div', { className: 'fade-curve-mini', 'aria-hidden': 'true' },
+        h('svg', { viewBox: '0 0 320 56', preserveAspectRatio: 'none' },
+          h('line', { x1: 0, y1: 4 + (1 - 0.15) * 46, x2: 320, y2: 4 + (1 - 0.15) * 46, stroke: 'var(--fade-danger)', strokeOpacity: .35, strokeDasharray: '3 4' }),
+          layers.map((layer) => h('path', {
+            key: layer.layer, d: pathFor(layer), fill: 'none', stroke: layer.color,
+            strokeWidth: layer.layer === 'L2' ? 1.8 : 1.4, strokeDasharray: layer.dash || undefined,
+            opacity: layer.layer === 'L0' ? .55 : .9,
+          })))),
+      h('div', { className: 'fade-curve-foot' },
+        h('span', null, `沉没 ${curve.sunk ?? 0} / 纳入 ${curve.eligible ?? 0}`),
+        h('span', null, `保护 ${curve.protected ?? 0}`),
+        legacy ? h('span', { className: 'warn' }, '模型预览') : null,
+        h('span', { className: 'go' }, '查看曲线 →')))
+    }
+
+    function Overview({ snapshot, onPerson, onSearch, onSource, onProvenance, onBrief, onSeries, onHealthAction, onCurve }) {
       const people = snapshot.people ?? []
       return h(React.Fragment, null,
         snapshot.health ? h(HealthCard, { health: snapshot.health, onAction: onHealthAction }) : null,
         h(BudgetCard, { snapshot }),
+        h(CurveSummaryCard, { curve: snapshot.curve, onOpen: onCurve }),
         h('div', { className: 'fade-quick' },
           h('button', { type: 'button', className: 'fade-qbtn', 'data-p': '1', onClick: onSearch },
             h('div', { className: 'fade-qtop' }, h(Icon, { name: 'search', size: 12 }), '搜记忆'),
@@ -1235,6 +1321,7 @@ window.__ModuleLoader__.load({
           onBrief: () => setSheet({ type: 'brief' }),
           onSeries: () => setSheet({ type: 'companions' }),
           onHealthAction: healthAction,
+          onCurve: () => setSheet({ type: 'curve' }),
         })
       } else if (tab === 'memory') {
         body = h(MemoryPane, {
@@ -1270,7 +1357,28 @@ window.__ModuleLoader__.load({
             remote, sessionId, book: sheetBook, chapter: snapshot?.chapter ?? 1,
             people: snapshot?.people ?? [], onClose: () => setSheet(null),
           })
-          : sheet.type === 'card'
+          : sheet.type === 'curve'
+            ? h(CurveSheet, {
+              remote, sessionId, book: sheetBook, chapter: snapshot?.chapter ?? 1, scheme,
+              onOpenChapter: (chapter) => {
+                setTab('memory'); setMemoryView('cards'); setChapterFilter(chapter); setSheet(null)
+              },
+              onOpenCard: (cardId, markerChapter) => {
+                const card = (snapshot?.cards ?? []).find((item) => item.id === cardId)
+                if (card) {
+                  setSheet({ type: 'card', card })
+                } else if (Number.isInteger(markerChapter)) {
+                  setTab('memory'); setMemoryView('cards'); setChapterFilter(markerChapter); setSheet(null)
+                } else {
+                  // Superseded markers may have no validTo/chapter and the card
+                  // can be outside the 60-card snapshot. Make the fallback
+                  // explicit instead of silently doing nothing.
+                  setTab('memory'); setMemoryView('cards'); setChapterFilter(null); setSheet(null)
+                }
+              },
+              onClose: () => setSheet(null),
+            })
+            : sheet.type === 'card'
             ? h(CardSheet, {
               card: sheet.card, chapter: snapshot?.chapter ?? sheet.card.chapter,
               sourceChapters: snapshot?.overview?.source?.list ?? [],
@@ -1580,6 +1688,281 @@ window.__ModuleLoader__.load({
         card.pinnedReason ? h('dt', null, '钉住原因') : null,
         card.pinnedReason ? h('dd', null, card.pinnedReason) : null),
       h('div', { className: 'fade-sub' }, cached ? '这一章原文已存；定位时会校验 sha。' : '这一章还没有原文缓存；先 memo_ingest（只存不用）。'))
+    }
+
+    function CurveChart({ data, mode = 'A', scheme = 'dark', onSelect = null }) {
+      const lineColor = (line) => scheme === 'light'
+        ? (line.colorLight ?? line.color ?? 'var(--fade-brand)')
+        : (line.color ?? 'var(--fade-brand)')
+      const [activeKey, setActiveKey] = React.useState(null)
+      const pointRefs = React.useRef(new Map())
+      const W = 360
+      const H = 210
+      const ML = 30
+      const MR = 12
+      const MT = 14
+      const MB = 24
+      const plotW = W - ML - MR
+      const plotH = H - MT - MB
+      const from = data?.meta?.window?.from ?? 1
+      const to = data?.meta?.window?.to ?? 1
+      const x = (chapter) => ML + ((chapter - from) / Math.max(1, to - from)) * plotW
+      const y = (value) => MT + (1 - Math.max(0, Math.min(1, Number(value) || 0))) * plotH
+      const showA = mode !== 'R'
+      const showR = mode !== 'A'
+      const grid = showA ? [0, 0.15, 0.5, 1] : [0, 0.5, 1]
+      const markers = (data?.markers ?? []).filter((marker) => Number.isInteger(marker.chapter))
+      const allPoints = []
+      for (const line of data?.lines ?? []) {
+        for (const [index, point] of line.points.entries()) {
+          allPoints.push({ key: `${line.id}:${point.chapter}`, line, point, index })
+        }
+      }
+      const movePoint = (entry, delta) => {
+        const points = entry.line.points
+        const next = Math.max(0, Math.min(points.length - 1, entry.index + delta))
+        const target = points[next]
+        if (!target) return
+        setActiveKey(`${entry.line.id}:${target.chapter}`)
+        pointRefs.current.get(`${entry.line.id}:${target.chapter}`)?.focus?.()
+        onSelect?.(target.chapter)
+      }
+      const parts = []
+      for (const value of grid) {
+        parts.push(h('line', {
+          key: `g${value}`, x1: ML, y1: y(value), x2: W - MR, y2: y(value),
+          stroke: value === 0.15 ? 'var(--fade-danger)' : 'var(--fade-line)',
+          strokeOpacity: value === 0.15 ? .55 : .7,
+          strokeDasharray: value === 0.15 ? '3 4' : undefined,
+        }))
+        parts.push(h('text', {
+          key: `gl${value}`, x: ML - 5, y: y(value) + 3, fill: value === 0.15 ? 'var(--fade-danger)' : 'var(--fade-faint)',
+          fontSize: 8, fontFamily: 'var(--fade-mono)', textAnchor: 'end',
+        }, value === 0.15 ? 'A .15' : value))
+      }
+      for (const chapter of [...new Set([from, Math.round((from + to) / 2), to])]) {
+        parts.push(h('text', {
+          key: `x${chapter}`, x: x(chapter), y: H - 6, fill: 'var(--fade-faint)',
+          fontSize: 8, fontFamily: 'var(--fade-mono)', textAnchor: 'middle',
+        }, chapter))
+      }
+      for (const marker of markers.slice(0, 120)) {
+        parts.push(h('line', {
+          key: `m${marker.id}`, x1: x(marker.chapter), y1: MT, x2: x(marker.chapter), y2: MT + plotH,
+          stroke: marker.type === 'validTo' ? 'var(--fade-warn)' : 'var(--fade-line-2)',
+          strokeOpacity: marker.type === 'validTo' ? .45 : .35,
+          strokeDasharray: '2 4',
+        }))
+      }
+      parts.push(h('line', {
+        x1: x(data?.meta?.chapter ?? to), y1: MT, x2: x(data?.meta?.chapter ?? to), y2: MT + plotH,
+        stroke: 'var(--fade-text)', strokeOpacity: .24, strokeDasharray: '2 4',
+      }))
+      for (const line of data?.lines ?? []) {
+        const stroke = lineColor(line)
+        const segments = line.segments?.length
+          ? line.segments
+          : [{ fromChapter: line.points[0]?.chapter, toChapter: line.points.at(-1)?.chapter }]
+        for (const [segmentIndex, segment] of segments.entries()) {
+          const points = line.points.filter((point) => point.chapter >= segment.fromChapter && point.chapter <= segment.toChapter)
+          if (points.length < 2) continue
+          const d = (key) => points.map((point, index) => `${index ? 'L' : 'M'}${x(point.chapter).toFixed(1)},${y(point[key]).toFixed(1)}`).join(' ')
+          if (showR) parts.push(h('path', {
+            key: `r${line.id}:${segmentIndex}`,
+            d: d('R'), fill: 'none', stroke, strokeWidth: 1, strokeOpacity: .32,
+            strokeDasharray: '2 4', strokeLinecap: 'round',
+          }))
+          if (showA) parts.push(h('path', {
+            key: `a${line.id}:${segmentIndex}`,
+            d: d('A'), fill: 'none', stroke, strokeWidth: 1.8,
+            strokeDasharray: line.dash || undefined, strokeLinecap: 'round', strokeLinejoin: 'round',
+          }))
+        }
+        const last = line.points.at(-1)
+        if (line.points.length === 1) {
+          const only = line.points[0]
+          const value = mode === 'R' ? only.R : only.A
+          parts.push(h('circle', {
+            key: `single${line.id}`, cx: x(only.chapter), cy: y(value), r: 3.2,
+            fill: stroke, stroke: 'var(--fade-bg)', strokeWidth: 1.2,
+          }))
+        }
+        if (last) {
+          const labelValue = mode === 'R' ? last.R : last.A
+          parts.push(h('text', {
+            key: `label${line.id}`, x: x(last.chapter) + 3, y: y(labelValue) + 2, fill: stroke,
+            fontSize: 7.5, fontFamily: 'var(--fade-mono)',
+          }, line.label ?? line.layer ?? ''))
+        }
+      }
+      const active = allPoints.some((entry) => entry.key === activeKey)
+        ? activeKey
+        : (allPoints[0]?.key ?? null)
+      for (const entry of allPoints) {
+        const { key, line, point, index } = entry
+        const stroke = lineColor(line)
+        const isActive = key === active
+        const value = mode === 'R' ? point.R : point.A
+        parts.push(h('circle', {
+          key: `dot${key}`, cx: x(point.chapter), cy: y(value), r: 2.1, fill: stroke,
+          stroke: 'var(--fade-bg)', strokeWidth: 0.8, pointerEvents: 'none',
+        }))
+        parts.push(h('circle', {
+          key: `pt${key}`,
+          ref: (element) => {
+            if (element) pointRefs.current.set(key, element)
+            else pointRefs.current.delete(key)
+          },
+          cx: x(point.chapter), cy: y(value), r: 9, fill: 'transparent',
+          role: 'button', tabIndex: isActive ? 0 : -1,
+          'aria-label': `第 ${point.chapter} 章，${line.label ?? line.layer ?? '曲线'}，可用度 ${Number(point.A).toFixed(3)}，留存 ${Number(point.R).toFixed(3)}，纳入 ${point.eligibleCount} 张`,
+          onFocus: () => setActiveKey(key),
+          onClick: () => { setActiveKey(key); onSelect?.(point.chapter) },
+          onKeyDown: (event) => {
+            if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+              event.preventDefault(); movePoint(entry, 1)
+            } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+              event.preventDefault(); movePoint(entry, -1)
+            } else if (event.key === 'Home') {
+              event.preventDefault(); movePoint(entry, -index)
+            } else if (event.key === 'End') {
+              event.preventDefault(); movePoint(entry, line.points.length - 1 - index)
+            } else if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault(); setActiveKey(key); onSelect?.(point.chapter)
+            }
+          },
+        }, h('title', null, `第 ${point.chapter} 章 · A ${Number(point.A).toFixed(3)} · R ${Number(point.R).toFixed(3)}`)))
+      }
+      return h('svg', {
+        viewBox: `0 0 ${W} ${H}`, role: 'img',
+        'aria-label': `记忆衰退曲线，第 ${from} 到 ${to} 章，${mode === 'both' ? '留存与激活' : mode === 'R' ? '留存率' : '激活度'}${showA ? '，单卡沉没线 0.15' : ''}`,
+      }, parts)
+    }
+
+    function CurveSheet({ remote, sessionId, book, chapter, scheme, onOpenChapter, onOpenCard, onClose }) {
+      const [series, setSeries] = React.useState('cards')
+      const [mode, setMode] = React.useState('A')
+      const [win, setWin] = React.useState('50')
+      const [layerFilter, setLayerFilter] = React.useState([])
+      const [selectedChapter, setSelectedChapter] = React.useState(null)
+      const [state, setState] = React.useState({ phase: 'loading', data: null, error: null })
+      const seq = React.useRef(0)
+      const layersKey = layerFilter.join('|')
+      const load = React.useCallback(async () => {
+        if (!remote || !sessionId) return
+        const mine = ++seq.current
+        setState({ phase: 'loading', data: null, error: null })
+        try {
+          const value = unwrap(await remote.curve(sessionId, {
+            book, chapter, curveVersion: 2, series, mode, window: win,
+            layers: layerFilter.length ? layerFilter : undefined, pointBudget: 48,
+          }))
+          if (mine !== seq.current) return
+          setState({ phase: 'ready', data: value, error: null })
+        } catch (error) {
+          if (mine !== seq.current) return
+          setState({ phase: 'error', data: null, error: String(error?.message ?? error) })
+        }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [remote, sessionId, book, chapter, series, mode, win, layersKey])
+      React.useEffect(() => {
+        const id = setTimeout(load, 160)
+        return () => { clearTimeout(id); seq.current += 1 }
+      }, [load])
+      const toggleLayer = (layer) => setLayerFilter((prev) => prev.includes(layer) ? prev.filter((item) => item !== layer) : prev.concat(layer))
+      const data = state.data
+      const currentPoints = (data?.lines ?? []).map((line) => line.points.find((point) => point.chapter === data.meta.chapter)).filter(Boolean)
+      const eligible = currentPoints.reduce((sum, point) => sum + (point.eligibleCount ?? 0), 0)
+      const sunk = currentPoints.reduce((sum, point) => sum + (point.stageCounts?.sunk ?? 0), 0)
+      const usedBytes = data?.meta?.budget?.usedBytes
+      const budgetText = Number.isFinite(usedBytes)
+        ? `主库 ${(usedBytes / (1024 * 1024)).toFixed(2)} / 3.00 MiB`
+        : '主库容量未知'
+      return h(Sheet, {
+        wide: true, title: '记忆衰退曲线', subtitle: `第 ${data?.meta?.chapter ?? chapter} 章 · 只读 · v4 模型`, onClose,
+      },
+      h('div', { className: 'fade-cfilters' },
+        [['cards', '卡片'], ['people', '人物'], ['chapters', '全书']].map(([id, label]) => h('button', {
+          key: id, type: 'button', className: 'fade-cfilter', 'data-a': series === id ? '1' : '0',
+          'aria-pressed': series === id, onClick: () => setSeries(id),
+        }, label)),
+        h('span', { style: { width: 4 } }),
+        ['L0', 'L1', 'L2', 'L3'].map((layer) => h('button', {
+          key: layer, type: 'button', className: 'fade-cfilter', 'data-a': layerFilter.includes(layer) ? '1' : '0',
+          'aria-pressed': layerFilter.includes(layer), onClick: () => toggleLayer(layer),
+        }, layer)),
+        h('span', { style: { width: 4 } }),
+        [['50', '近50'], ['100', '近100'], ['all', '全部']].map(([id, label]) => h('button', {
+          key: id, type: 'button', className: 'fade-cfilter', 'data-a': win === id ? '1' : '0',
+          'aria-pressed': win === id, onClick: () => setWin(id),
+        }, label))),
+      h('div', { className: 'fade-cseg', style: { marginTop: 7, width: 'fit-content' } },
+        [['A', 'A 激活'], ['R', 'R 留存'], ['both', 'A + R']].map(([id, label]) => h('button', {
+          key: id, type: 'button', 'data-a': mode === id ? '1' : '0',
+          'aria-pressed': mode === id, onClick: () => setMode(id),
+        }, label))),
+      state.phase === 'loading' ? h(Loading, { label: '计算衰退曲线…' })
+        : state.phase === 'error' ? h(ErrorBox, { error: state.error, onRetry: load })
+          : !data || data.exists === false || !(data.lines ?? []).some((line) => line.points.length)
+            ? h('div', { className: 'fade-curve-empty' }, '还没有可计算的卡片；先完成一章 memo_digest。')
+            : h(React.Fragment, null,
+              h('div', { className: 'fade-curve-hero', style: { marginTop: 9 } },
+                h(CurveChart, { data, mode, scheme, onSelect: setSelectedChapter }),
+                h('div', { className: 'fade-curve-note' }, `按当前记忆状态推算，不是逐章历史实测 · ${series === 'people' ? `关联 ${eligible} 次` : `纳入 ${eligible} 张`} · ${series === 'people' ? `沉没关联 ${sunk} 次` : `沉没 ${sunk} 张`} · 窗口第 ${data.meta.window.from}–${data.meta.window.to} 章 · ${budgetText}`)),
+              h('div', { className: 'fade-clegend' },
+                (data.legend ?? []).map((item) => {
+                  const color = scheme === 'light' ? (item.colorLight ?? item.color) : item.color
+                  return h('span', { key: item.id, style: { color } },
+                    h('i', { style: { background: color } }), item.label)
+                }),
+                mode !== 'R' ? h('span', { style: { color: 'var(--fade-danger)' } },
+                  h('i', { style: { background: 'var(--fade-danger)' } }), '沉没线 A .15') : null),
+              h('div', { className: 'fade-sec' }, h('h3', null, '数值读数'), h('span', null, selectedChapter ? `已选第 ${selectedChapter} 章` : '点图表或按 Enter')),
+              h('label', { className: 'fade-curve-note', style: { display: 'flex', alignItems: 'center', gap: 7 } },
+                '章节读数',
+                h('select', {
+                  className: 'fade-select', value: selectedChapter ?? data.meta.chapter,
+                  'aria-label': '选择曲线章节读数',
+                  onChange: (event) => setSelectedChapter(Number(event.target.value)),
+                }, [...new Set((data.lines ?? []).flatMap((line) => line.points.map((point) => point.chapter)))]
+                  .sort((a, b) => a - b)
+                  .map((chapter) => h('option', { key: chapter, value: chapter }, `第 ${chapter} 章`)))),
+              h('div', { className: 'fade-marker-list' },
+                (data.lines ?? []).map((line) => {
+                  const target = selectedChapter ?? data.meta.chapter
+                  const point = line.points.find((item) => item.chapter === target)
+                    ?? (selectedChapter == null ? line.points.at(-1) : null)
+                  if (!point) return null
+                  return h('button', {
+                    key: `read${line.id}`, type: 'button', className: 'fade-marker',
+                    onClick: () => setSelectedChapter(point.chapter),
+                    'aria-label': `${line.label ?? line.layer ?? '曲线'} 第 ${point.chapter} 章，可用度 ${Number(point.A).toFixed(3)}，留存 ${Number(point.R).toFixed(3)}，纳入 ${point.eligibleCount} 张`,
+                  },
+                  h('b', null, `第 ${point.chapter} 章`),
+                  h('span', null, line.label ?? line.layer ?? '曲线'),
+                  h('span', { className: 'tag' }, `A ${Number(point.A).toFixed(3)} · R ${Number(point.R).toFixed(3)} · ${point.eligibleCount} 张`))
+                })),
+              h('div', { className: 'fade-sec' }, h('h3', null, '边界与保护'), h('span', null, `${data.markers?.length ?? 0} 个标记`)),
+              selectedChapter && onOpenChapter
+                ? h('button', { type: 'button', className: 'fade-link', onClick: () => onOpenChapter(selectedChapter) },
+                  `在记忆里看第 ${selectedChapter} 章 →`)
+                : null,
+              h('div', { className: 'fade-marker-list' },
+                (data.markers ?? []).filter((marker) => marker.type !== 'sinkThreshold').slice(0, 10).map((marker) => h('button', {
+                  key: marker.id, type: 'button', className: 'fade-marker',
+                  onClick: () => {
+                    if (marker.cardId && onOpenCard) onOpenCard(marker.cardId, marker.chapter)
+                    else if (Number.isInteger(marker.chapter)) setSelectedChapter(marker.chapter)
+                  },
+                  'aria-label': `${marker.label}${Number.isInteger(marker.chapter) ? `，第 ${marker.chapter} 章` : ''}`,
+                },
+                h('b', null, Number.isInteger(marker.chapter) ? `第 ${marker.chapter} 章` : '时间未知'),
+                h('span', null, marker.label),
+                h('span', { className: 'tag' }, marker.layer ?? marker.type))),
+                (data.warnings ?? []).map((warning) => h('div', { key: warning.code, className: 'fade-marker' },
+                  h('b', null, '提示'), h('span', null, warning.code), h('span', { className: 'tag' }, warning.severity ?? 'info')))),
+              h('div', { className: 'fade-curve-note', style: { marginTop: 10 } },
+                '只读曲线：不写卡片、不强化、不归档。what-if 与写库维护留在 0.8.2。')))
     }
 
     function CharacterSheet({ remote, sessionId, book, name, onClose }) {

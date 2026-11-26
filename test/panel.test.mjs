@@ -8,6 +8,8 @@ import { mutateMemory, readMemory } from '../lib/store.js'
 import {
   PANEL_MAX_CARDS,
   buildCurve,
+  buildCurveSummary,
+  buildCurveV2,
   buildPanelSnapshot,
   readBriefPreview,
   readPanelBooks,
@@ -15,6 +17,7 @@ import {
   buildChapterDetail,
   sampleChapters,
 } from '../lib/panel.js'
+import { emptyMemory } from '../lib/schema.js'
 import { toolDefinitions } from '../lib/tools.js'
 import { BOOK, allChapterFixtures, chapterFixture, commitFixtureChapter } from '../test-support/twenty.mjs'
 
@@ -320,6 +323,132 @@ test('panel v2: tool surface can recall/state/ingest on the fixture book', async
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+})
+
+test('curve v2: uses v4 retention, bands and markers; v1 stays legacy', () => {
+  const memory = emptyMemory({ book: '曲线' })
+  for (const layer of ['L0', 'L1', 'L2', 'L3']) {
+    memory.cards.push({
+      id: `c-${layer}`, chapter: 1, layer, topic: `主题${layer}`, gist: '这是曲线测试卡。',
+      quote: '曲线。', source: 'model', kind: 'standard', importanceScore: 0.5,
+    })
+  }
+  memory.cards.push({
+    id: 'c-forgotten', chapter: 2, layer: 'L2', topic: '不能泄漏的秘密', gist: '秘密内容',
+    forgotten: true,
+  })
+  memory.cards.push({
+    id: 'c-valid', chapter: 1, layer: 'L2', topic: '有效期卡', gist: '有效期内容', validTo: 2,
+  })
+  memory.cards.push({
+    id: 'c-superseded', chapter: 1, layer: 'L2', topic: '旧事实', gist: '旧事实内容', superseded: true,
+  })
+  const curve = buildCurveV2(memory, { chapter: 100, series: 'cards', window: 'all', pointBudget: 24 })
+  assert.equal(curve.curveVersion, 2)
+  assert.equal(curve.meta.basis, 'current-snapshot-model')
+  assert.equal(curve.bands.length, 4)
+  assert.equal(curve.meta.pointCount <= 96, true)
+  assert.equal(curve.meta.window.from, 1)
+  assert.equal(curve.meta.window.to, 100)
+  const l0 = curve.lines.find((line) => line.layer === 'L0')
+  const l1 = curve.lines.find((line) => line.layer === 'L1')
+  const l2 = curve.lines.find((line) => line.layer === 'L2')
+  assert.equal(l0.points.every((point) => point.A === 1), true)
+  assert.equal(l1.points.every((point) => point.A >= 0.25), true)
+  assert.equal(l2.points.some((point) => point.A < 0.15), true)
+  assert.equal(curve.markers.some((marker) => marker.type === 'sinkThreshold'), true)
+  assert.equal(curve.markers.some((marker) => marker.type === 'validTo'), true)
+  assert.equal(curve.markers.some((marker) => marker.type === 'superseded' && marker.chapter === null), true)
+  assert.equal(JSON.stringify(curve).includes('c-forgotten'), false)
+  assert.equal(JSON.stringify(curve).includes('不能泄漏的秘密'), false)
+  assert.equal(curve.warnings.some((warning) => warning.code === 'history-incomplete'), true)
+  const summary = buildCurveSummary(memory, 100)
+  assert.equal(summary.eligible >= 4, true)
+  assert.equal(summary.sunk >= 1, true)
+  assert.equal(summary.A >= 0 && summary.A <= 1, true)
+
+  const legacy = buildCurve(memory, { chapter: 100 })
+  assert.equal(legacy.threshold, 0.55)
+  assert.equal(legacy.curveVersion, undefined)
+})
+
+test('curve v2: people and chapters series, plus layer filtering', () => {
+  const memory = emptyMemory({ book: '系列曲线' })
+  memory.entities['e:lin'] = { id: 'e:lin', name: '林昭', aliases: [] }
+  memory.entities['e:shen'] = { id: 'e:shen', name: '沈砚', aliases: [] }
+  memory.cards.push(
+    { id: 'c1', chapter: 1, layer: 'L2', topic: '林昭', gist: '在场。', entityIds: ['e:lin'] },
+    { id: 'c2', chapter: 2, layer: 'L2', topic: '沈砚', gist: '在场。', entityIds: ['e:shen'] },
+  )
+  const people = buildCurveV2(memory, { chapter: 20, series: 'people', pointBudget: 12 })
+  assert.equal(people.lines.length, 2)
+  assert.equal(people.lines.every((line) => line.series === 'people'), true)
+  const chapters = buildCurveV2(memory, { chapter: 20, series: 'chapters', pointBudget: 12 })
+  assert.equal(chapters.lines.length, 1)
+  assert.equal(chapters.lines[0].series, 'chapters')
+  const onlyL2 = buildCurveV2(memory, { chapter: 20, layers: ['L2'], pointBudget: 12 })
+  assert.equal(onlyL2.lines.length, 1)
+  assert.equal(onlyL2.lines[0].layer, 'L2')
+})
+
+test('curve v2: layer filter applies to people/chapters and markers stay in the window', () => {
+  const memory = emptyMemory({ book: '曲线过滤' })
+  memory.entities['e:lin'] = { id: 'e:lin', name: '林昭', aliases: [] }
+  memory.cards.push(
+    { id: 'l2', chapter: 1, layer: 'L2', topic: 'L2', gist: 'L2。', entityIds: ['e:lin'], pinned: true },
+    { id: 'l3', chapter: 1, layer: 'L3', topic: 'L3', gist: 'L3。', entityIds: ['e:lin'] },
+  )
+  const curve = buildCurveV2(memory, {
+    chapter: 200, window: '50', series: 'people', layers: ['L2'], pointBudget: 24, usedBytes: 0,
+  })
+  assert.equal(curve.lines.length, 1)
+  assert.equal(curve.lines[0].points.every((point) => point.eligibleCount === 1), true)
+  assert.equal(curve.markers.some((marker) => marker.cardId === 'l2' && marker.type === 'archiveCandidate'), false)
+  assert.equal(curve.markers.some((marker) => marker.cardId === 'l2' && marker.type === 'pinned'), false)
+  assert.equal(curve.markers.some((marker) => marker.cardId === 'l3'), false)
+})
+
+test('curve v2: archiveCandidate needs actual 50 chapters under sunk, not just card age', () => {
+  const memory = emptyMemory({ book: '归档候选' })
+  memory.cards.push({ id: 'arc', chapter: 1, layer: 'L2', topic: '旧支线', gist: '旧支线。' })
+  const early = buildCurveV2(memory, { chapter: 66, usedBytes: 4 * 1024 * 1024, pointBudget: 12 })
+  assert.equal(early.markers.some((marker) => marker.type === 'archiveCandidate'), false)
+  const late = buildCurveV2(memory, { chapter: 200, usedBytes: 4 * 1024 * 1024, pointBudget: 12 })
+  assert.equal(late.markers.some((marker) => marker.type === 'archiveCandidate'), true)
+})
+
+test('curve v2: creation boundaries are sampled and validity gaps split segments', () => {
+  const memory = emptyMemory({ book: '断线与创建章' })
+  memory.cards.push(
+    { id: 'early', chapter: 1, layer: 'L2', topic: '早期', gist: '早期。', validTo: 2 },
+    { id: 'late', chapter: 8, layer: 'L2', topic: '后期', gist: '后期。' },
+    { id: 'far', chapter: 777, layer: 'L2', topic: '远章', gist: '远章。' },
+  )
+  const curve = buildCurveV2(memory, { chapter: 900, window: 'all', pointBudget: 12 })
+  const l2 = curve.lines.find((line) => line.layer === 'L2')
+  assert.equal(l2.points.some((point) => point.chapter === 777), true)
+  assert.equal(l2.segments.length >= 2, true)
+  const gap = l2.segments.some((segment) => segment.fromChapter <= 2 && segment.toChapter >= 8)
+  assert.equal(gap, false)
+})
+
+test('curve v2: dense extras still keep the latest chapter in the sample', () => {
+  const memory = emptyMemory({ book: '最新章采样' })
+  for (let chapter = 1; chapter <= 200; chapter += 1) {
+    memory.cards.push({ id: `dense-${chapter}`, chapter, layer: 'L2', topic: `章${chapter}`, gist: 'x' })
+  }
+  const curve = buildCurveV2(memory, { chapter: 200, window: 'all', pointBudget: 12, usedBytes: 0 })
+  const l2 = curve.lines.find((line) => line.layer === 'L2')
+  assert.equal(l2.points.at(-1).chapter, 200)
+  assert.equal(curve.meta.pointCount <= 96, true)
+})
+
+test('curve v2: empty book is explicit and does not fabricate lines', () => {
+  const curve = buildCurveV2(emptyMemory({ book: '空' }), { chapter: 3 })
+  assert.equal(curve.ok, true)
+  assert.equal(curve.exists, false)
+  assert.deepEqual(curve.lines, [])
+  assert.equal(curve.meta.pointCount >= 2, true)
 })
 
 test('curve: a 500-chapter book keeps points across the whole range', () => {

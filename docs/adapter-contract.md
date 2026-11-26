@@ -1,4 +1,4 @@
-﻿# dsh-novel-fade · 适配契约（v0.7.1）
+# dsh-novel-fade · 适配契约（v0.8.2）
 
 > 面向 `dsh-novel-conductor` / `dsh-novel-beat` / `dsh-novel-voice` / `dsh-novel-fanfic` 的只读集成契约。
 > 本文件是开发者契约，不是用户设置页；fade 不要求任何兄弟插件先安装。

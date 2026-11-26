@@ -1,4 +1,4 @@
-# dsh-novel-fade · 契约与能力声明（v0.7.1）
+# dsh-novel-fade · 契约与能力声明（v0.8.2）
 
 > 对应五插件协作契约 v1.2（文件名保留 `小说插件系列-五插件协作契约-v1.1.md`）。
 > 本文件只声明 fade 侧的 identity、能力、只读服务与收据；不改契约正文。
@@ -8,7 +8,7 @@
 ```jsonc
 {
   "plugin": "dsh-novel-fade",
-  "version": "0.7.1",
+  "version": "0.8.2",
   "service_version": 1,
   "capabilities": ["fade.brief", "fade.status", "fade.revision", "fade.artifact", "fade.companions"],
   "dir": ".dsh-novel-fade",
@@ -111,12 +111,12 @@
 | 工具前缀 | `memo_` |
 | 命令 | `/memo` |
 | 右栏 tab kind | `novel-fade` |
-| 工具数 | 8（`memo_pin` 为第 8 个） |
+| 工具数 | 10（原 8 个 + `memo_check` / `memo_consolidate`） |
 
 ## 7. 履约检查表
 
 - [x] `ctx.provide('novelFade', api)`，`ctx.get` 有测试。
-- [x] `identity` 字段齐全，`version` 与 `package.json` 一致（0.7.1）。
+- [x] `identity` 字段齐全，`version` 与 `package.json` 一致（0.8.2）。
 - [x] 所有服务方法只读；无写方法。
 - [x] 第一个参数是 `cwd`；相对路径报错。
 - [x] `revision` 单调；`getBrief` 自带 `revision` 与 `generated_at`。

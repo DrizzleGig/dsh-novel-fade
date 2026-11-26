@@ -451,7 +451,10 @@ test('tools: eight names; digest->brief->state through the real tool surface', a
   const dir = await tempDir()
   try {
     const defs = Object.fromEntries(toolDefinitions().map((def) => [def.name, def]))
-    assert.deepEqual(Object.keys(defs).sort(), ['memo_brief', 'memo_digest', 'memo_forget', 'memo_ingest', 'memo_pin', 'memo_recall', 'memo_source', 'memo_state'])
+    assert.deepEqual(Object.keys(defs).sort(), [
+      'memo_brief', 'memo_check', 'memo_consolidate', 'memo_digest', 'memo_forget',
+      'memo_ingest', 'memo_pin', 'memo_recall', 'memo_source', 'memo_state',
+    ])
 
     const preview = await defs.memo_digest.execute({ dir, book: BOOK, chapter: 1, text: TEXT })
     assert.equal(preview.stage, 'extract')
@@ -528,7 +531,7 @@ test('index: /memo on registers the session mode and lifts the tool restriction'
       on() { return () => {} },
     }
     await apply(ctx)
-    assert.equal(tools.size, 8)
+    assert.equal(tools.size, 10)
     assert.equal(restrictions, 1)
     assert.equal(activeRestrictions, 1)
 
@@ -543,6 +546,31 @@ test('index: /memo on registers the session mode and lifts the tool restriction'
     const status = await memo.handler({ rawInput: 'status', agent })
     assert.equal(status.kind, 'success')
     assert.match(status.text, /开/)
+
+    const scopeBook = '命令作用域'
+    await mutateMemory(dir, scopeBook, (memory) => {
+      memory.entities['e:lin'] = { id: 'e:lin', name: '林昭', aliases: [] }
+      memory.cards.push({
+        ...normalizeCard({
+          topic: '林昭', gist: '林昭在场。', quote: '林昭在场。', layer: 'L0', contract: { kind: 'death' },
+        }, { chapter: 1, digestVersion: 1 }),
+        id: 'c-scope-1',
+      })
+    }, { create: true })
+    const preview = await memo.handler({ rawInput: `scope ${scopeBook} c-scope-1 entity e:lin`, agent })
+    assert.equal(preview.kind, 'success')
+    assert.match(preview.text, /预览/)
+    const proposal = preview.text.match(/confirm:([a-f0-9]+)/)?.[1]
+    assert.ok(proposal)
+    const before = (await readMemory(dir, scopeBook)).memory
+    assert.equal(before.cards[0].contract?.applicability, undefined)
+    const applied = await memo.handler({
+      rawInput: `scope ${scopeBook} c-scope-1 entity e:lin confirm:${proposal}`, agent,
+    })
+    assert.equal(applied.kind, 'success')
+    assert.match(applied.text, /已把/)
+    const after = (await readMemory(dir, scopeBook)).memory
+    assert.deepEqual(after.cards[0].contract.applicability, { scope: 'entity', entityIds: ['e:lin'] })
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

@@ -59,9 +59,13 @@ async function main() {
       continue
     }
     const extraction = JSON.parse(extractionText)
-    const sourceText = annotation.source ? (await readOptional(annotation.source)) ?? '' : ''
+    const sourceText = annotation.source ? await readOptional(annotation.source) : ''
+    if (annotation.source && sourceText === null) {
+      results.push({ name: base, chapter: annotation.chapter, skipped: true, reason: 'source-missing' })
+      continue
+    }
     const brief = noBrief ? '' : (await readOptional(briefPath)) ?? ''
-    const report = evaluateQuality({ annotation, extraction, brief, sourceText })
+    const report = evaluateQuality({ annotation, extraction, brief, sourceText: sourceText ?? '' })
     results.push({ name: base, ...report })
   }
 

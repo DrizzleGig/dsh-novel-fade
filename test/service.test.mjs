@@ -1,4 +1,4 @@
-﻿import test from 'node:test'
+import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises'
@@ -13,7 +13,7 @@ import { createFadeService } from '../lib/service.js'
 import { bookFilePath, getSessionMode, mutateMemory, readMemory } from '../lib/store.js'
 
 const BOOK = '雨夜服务测试'
-const VERSION = '0.7.2'
+const VERSION = '0.8.2'
 const SCENE = { location: '枯井', entities: ['林川'], props: ['钥匙'] }
 const TEXT = '林川走到枯井边，把钥匙放在石沿上。雨落在油纸伞上。他转身走进雨里。'
 
@@ -387,7 +387,7 @@ test('index: provides novelFade within an effect and keeps reads available acros
   const api = services.get('novelFade')
   assert.ok(api)
   assert.equal(api.identity().version, VERSION)
-  assert.equal(tools.size, 8)
+  assert.equal(tools.size, 10)
   assert.equal(restrictions, 1)
   assert.equal(tools.get('memo_brief').when({ agent }), false)
   assert.equal((await api.getBrief({ cwd, book: BOOK, chapter: 2 })).revision, 1)

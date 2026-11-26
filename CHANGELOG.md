@@ -1,3 +1,39 @@
+## 0.8.2 — 2026-11-26 · 巩固、归档与只读诊断（已发布 npm 2026-11-26T09:58:11Z）
+
+### 新增
+
+- **memo_check**：`health` / `consistency`（14 条规则）/ `forgetting`；只读，不写库，不调用模型。
+- **memo_consolidate**：`kind=archive` 时 `preview` 生成候选与 proposalHash，`apply`（`archive` 为兼容别名）需 proposalHash + expectedRevision，先计算对象 hash 并原子写入不可变 `archive/<archiveId>.json`，再提交 memory manifest/stub；`restore` / `rollback` 从归档对象恢复；`kind=summary` 时用 `preview`/`apply`/`rollback` 管理固定弧/卷摘要。不自动删正文。
+- **归档 stub**：`memory.archive.objects/stubs`；主库不再保留冷卡正文；归档卡不进入 brief/普通 recall。
+- **容量/字数**：`memo_state` 增加真实 memory bytes、archived、consolidationDue、L1 容量、millionWord 统计。
+- **双库/隔离**：`memory.json` 与 `sources/` 分离；工作区 + 书双层目录；新增跨会话、两个工作区、同工作区两本书的隔离测试。
+- **曲线 UI**：v4 R/A 只读曲线、L0–L3、沉没线、有效期/保护、容量；侧栏摘要与专用 sheet。
+
+### 兼容
+
+- 保留 8 个旧工具签名；工具总数 10。
+- 旧记忆不需要迁移；无 archive 字段时按无归档处理。
+- 归档对象/ manifest 损坏时只报告，不覆盖主库。
+
+### 已知问题
+
+- 真实宿主曲线已打开并截图（`docs/assets/dsh-fade-host-curve.png`），但 300/340/380/420px 与浅色系统主题未逐档验收；公式演示 mock 不算宿主验收。
+- purge 双确认/全副本清除仍关闭。
+- 真书实测与 kit 0.6 双向按作者要求后置。
+## 0.8.0 — 2026-11-26 · 遗忘曲线与只读侧栏工作台
+
+### 新增
+
+- **记忆衰退曲线 v2**：`buildCurveV2` / `readCurve({curveVersion:2})` 使用 v4 `retentionFor`，输出 R/A、L0–L3 bands、沉没线、有效性/钉住/保护 marker、自适应采样、容量与警告；旧 `buildCurve` 仍保留 v1 形状。
+- **只读曲线 sheet**：右侧栏总览新增“记忆衰退曲线”摘要卡；打开专用宽 sheet，支持 A/R/Both、cards/people/chapters、L0–L3、近 50/100/全部，窄栏 SVG + 图例 + marker 列表。
+- **曲线摘要**：`snapshot.curve` 提供当前章中位 A/R、纳入/沉没/保护计数、容量与策略，供总览首屏使用。
+- **真实字节容量**：`readCurve` 读取当前 `memory.json` 的实际 UTF-8 字节，显示 3 MiB 软线 / 4 MiB 硬线；读不到时明确 `budget-unavailable`。
+
+### 说明
+
+- 0.8.0 曲线只读，不强化、不沉没、不归档、不写卡片；what-if 与归档维护留 0.8.2。
+- `last_reinforced_at` 默认值不画成强化事件；无可信 receipt 时显示“历史未知”。
+- 生产 UI 截图仍需真实宿主；`docs/assets/fade-ui-curve-mock.png` 是公式演示 mock，不是实测。
 ## 0.7.2 — 2026-11-21
 
 - 接管：`applyAgentMode` 改用 `effectiveOn`，订阅 `novel-conductor/drive` 重算本会话（含 deny restrict 的收放）。

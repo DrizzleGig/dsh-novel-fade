@@ -13,15 +13,23 @@ test('client contract: three primary entries and one brief CTA', () => {
   assert.doesNotMatch(source, /SECTIONS = \[/)
 })
 
-test('client contract: sheets are used for brief, card, character, source and companions', () => {
-  for (const type of ['brief', 'card', 'character', 'source', 'companions']) {
+test('client contract: sheets are used for brief, curve, card, character, source and companions', () => {
+  for (const type of ['brief', 'curve', 'card', 'character', 'source', 'companions']) {
     assert.match(source, new RegExp(`type: '${type}'`), `missing sheet type ${type}`)
   }
   assert.match(source, /function Sheet\(/)
   assert.match(source, /function BriefSheet\(/)
+  assert.match(source, /function CurveSheet\(/)
+  assert.match(source, /function CurveChart\(/)
+  assert.match(source, /function CurveSummaryCard\(/)
   assert.match(source, /function CardSheet\(/)
   assert.match(source, /function CharacterSheet\(/)
   assert.match(source, /function CompanionsSheet\(/)
+  assert.match(source, /curveVersion: 2/)
+  assert.match(source, /aria-pressed/)
+  assert.match(source, /数值读数/)
+  assert.match(source, /onSelect: setSelectedChapter/)
+  assert.match(source, /colorLight/)
 })
 
 test('client contract: dark and light palettes are both declared', () => {

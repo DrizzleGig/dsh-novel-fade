@@ -1,16 +1,20 @@
-﻿/**
- * dsh-novel-fade — 有损记忆 / 小说记忆插件（v0.7.1）
+/**
+ * dsh-novel-fade — 有损记忆 / 小说记忆插件（v0.8.2）
  *
  * 独立运行：不 import beat，不调用 beat 工具。
  * 装了 dsh-novel-beat 时，只读 <dir>/.dsh-novel-beat/<book>/book.json 做增强。
  *
  * 默认关闭：/memo on 之后 memo_* 才进入该会话的工具表。
  */
+import { createHash } from 'node:crypto'
 import { toolDefinitions } from './lib/tools.js'
-import { getSessionMode, setSessionMode } from './lib/store.js'
+import {
+  getSessionMode, setSessionMode, readMemory, mutateMemory, revisionInfo,
+} from './lib/store.js'
+import { memoryState } from './lib/state.js'
 import { createFadeService } from './lib/service.js'
 
-const VERSION = '0.7.2'
+const VERSION = '0.8.2'
 
 export const inject = ['tools', 'commands', 'workingDirectory', 'agents']
 
@@ -34,7 +38,7 @@ const SKILL = {
     '3. 用户只让你改正文、或你是在“作家助手”里手写：保存/复制正文后，仍要执行第 2 步；不能因为没经过 `novel_write_chapter` 就跳过。',
     '4. 下一章开写前 `memo_state` 检查：缺 digest 的章、未确认高光、到期 thread 先处理；`health` 里的 block/warn 优先看。',
     '',
-    '## 八个工具',
+    '## 十个工具',
     '',
     '- `memo_brief(dir, book, chapter, scene)`：写下一章前**必调**。canon 独立，六段创作记忆；默认 1400 字。',
     '- `memo_digest(dir, book, chapter, text|path, cards, sheet)`：写完一章后沉淀。quote/ending/keyLines 必须逐字来自正文；没给 cards 只预览。默认顺手把本章正文存进「原文贮存」（只存不用；要关传 `source:false`）。',
@@ -44,6 +48,14 @@ const SKILL = {
     '- `memo_state(dir, book, chapter)`：记忆体检；含 L0/L1/L2/L3 分布、未解决硬契约，以及结构化 `health`（L0_OVERLOAD / THREAD_OVERDUE / SOURCE_MISSING / REVISION_DRIFT 等）。',
     '- `memo_ingest(dir, book, chapter, text|path)`：给**旧章**补原文储备（digest 已自动存新章）；不写记忆卡、不调用模型。',
     '- `memo_source(dir, book, chapter, query|from|len)`：卡被褪掉、要核对原句时才读一小段（≤4000 字）；返回 offset/sha256/stale，原文改过会明确标记，不要假装定位准确。',
+    '- `memo_check(dir, book, chapter, mode)`：只读体检；`health` / `consistency`（14 条规则）/ `forgetting`（沉没与归档候选）。不写库、不调用模型。',
+    '- `memo_consolidate(dir, book, action, kind, ...)`：`kind=archive` 时 `preview`/`apply`（`archive` 为兼容别名）/`restore`/`rollback` 管理不可变冷归档；`kind=summary` 时 `preview`/`apply`/`rollback` 管理固定弧/卷摘要。写操作需 proposalHash+expectedRevision；不删除正文。',
+    '',
+    '## 双库与隔离',
+    '',
+    '- **记忆库** = `memory.json`（章节卡、brief、state、审计）；**原文库** = `sources/`（整章原文，只供 `memo_source` 显式核对/回源）。写章时只用记忆库；`sources/` 不会被自动注入 brief。',
+    '- 记忆按 **工作区 + 书** 存放：`<workspace>/.dsh-novel-fade/<book>/`。新建对话不会重置记忆；在同一个工作区新开对话，重新 `/memo on` 后继续用同一本 `book` 即可续写。',
+    '- 不同工作区即使书名相同也各自独立；同一工作区两本书各自目录，不串卡。不要用不同工作区去写同一本书，也不要让模型手动拼接目录。',
     '',
     '## 收据与回查',
     '',
@@ -176,9 +188,9 @@ export async function apply(ctx) {
   if (commands?.register) {
     ctx.effect(() => commands.register({
       name: 'memo',
-      description: '开关褪色记忆：/memo on、/memo off、/memo status',
+      description: '开关褪色记忆：/memo on、/memo off、/memo status、/memo scope',
       // 带参数的命令必须声明 input，否则 `/memo on` 会被当成普通消息发给模型。
-      input: { hint: 'on | off | status' },
+      input: { hint: 'on | off | status | scope <book> [cardId scope ids...]' },
       handler: async (invocation) => {
         const raw = String(invocation?.rawInput ?? '')
           .trim()
@@ -189,6 +201,91 @@ export async function apply(ctx) {
         if (!agent?.id) return { kind: 'error', text: '拿不到当前会话，无法切换褪色记忆。' }
         const dir = await dirFor(agent)
         if (!dir) return { kind: 'error', text: '拿不到当前工作区，无法切换褪色记忆。' }
+
+        if (action === 'scope') {
+          const parts = raw.split(/\s+/).filter(Boolean).slice(1)
+          const book = parts[0]
+          if (!book) {
+            return { kind: 'error', text: '用法：/memo scope <book>；或 /memo scope <book> <cardId> <global|entity|thread|arc> <ids...>' }
+          }
+          try {
+            const { memory } = await readMemory(dir, book)
+            if (!memory) return { kind: 'error', text: `书「${book}」还没有记忆。` }
+            if (!parts[1]) {
+              const state = memoryState(memory, { status: 'absent' }, 1)
+              const triage = state.scopeTriage
+              if (!triage) return { kind: 'success', text: '这本书没有需要整理作用域的 L0。' }
+              const lines = triage.items.slice(0, 12).map((item) => `- ${item.id} · ${item.topic} · ${item.scope}`)
+              return {
+                kind: 'success',
+                text: `L0 作用域（${triage.requiredHardIds.length} 条）：\n${lines.join('\n')}${triage.nextActions.length ? `\n${triage.nextActions.join('\n')}` : ''}`,
+              }
+            }
+            const confirmPart = parts.find((part) => part.startsWith('confirm:'))
+            const confirm = confirmPart ? confirmPart.slice('confirm:'.length) : ''
+            const rest = parts.filter((part) => !part.startsWith('confirm:'))
+            const cardId = rest[1]
+            const scope = rest[2]
+            const ids = (rest[3] ?? '').split(',').map((id) => id.trim()).filter(Boolean)
+            if (!['global', 'entity', 'thread', 'arc'].includes(scope)) {
+              return { kind: 'error', text: 'scope 只能是 global / entity / thread / arc。' }
+            }
+            if (scope !== 'global' && ids.length === 0) {
+              return { kind: 'error', text: `${scope} 作用域需要至少一个 id。` }
+            }
+            const card = memory.cards.find((entry) => entry.id === cardId)
+            if (!card) return { kind: 'error', text: `找不到卡片 ${cardId}` }
+            if (scope === 'entity') {
+              const known = new Set([
+                ...Object.keys(memory.entities ?? {}),
+                ...Object.keys(memory.state?.entities ?? {}),
+              ])
+              const missing = ids.filter((id) => !known.has(id))
+              if (missing.length) return { kind: 'error', text: `entity 目标不存在：${missing.join('、')}` }
+            }
+            if (scope === 'thread') {
+              const known = new Set([
+                ...(memory.threads ?? []).map((thread) => thread.id),
+                ...Object.keys(memory.state?.threads ?? {}),
+              ])
+              const missing = ids.filter((id) => !known.has(id))
+              if (missing.length) return { kind: 'error', text: `thread 目标不存在：${missing.join('、')}` }
+            }
+            const revision = revisionInfo(memory).revision
+            const proposalHash = createHash('sha256')
+              .update(JSON.stringify({ book, cardId, scope, ids, revision }), 'utf8')
+              .digest('hex')
+            if (!confirm) {
+              return {
+                kind: 'success',
+                text: `预览：${cardId} → ${scope}${ids.length ? `（${ids.join('、')}）` : ''}；当前 revision ${revision}。\n确认请追加 confirm:${proposalHash}`,
+              }
+            }
+            if (confirm !== proposalHash) {
+              return { kind: 'error', text: `确认码与当前提案不一致；重新预览。正确确认码：confirm:${proposalHash}` }
+            }
+            await mutateMemory(dir, book, (ledger) => {
+              const target = ledger.cards.find((entry) => entry.id === cardId)
+              if (!target) throw new Error(`找不到卡片 ${cardId}`)
+              target.contract ??= {}
+              target.contract.applicability = scope === 'global'
+                ? { scope }
+                : scope === 'entity' ? { scope, entityIds: ids }
+                  : scope === 'thread' ? { scope, threadIds: ids }
+                    : { scope, arcIds: ids }
+              ledger.audit.push({
+                at: new Date().toISOString(),
+                action: 'scope',
+                chapter: target.chapter ?? null,
+                ids: [cardId],
+                reason: `set ${scope} (author confirm ${proposalHash})`,
+              })
+            }, { expectedRevision: revision })
+            return { kind: 'success', text: `已把 ${cardId} 的作用域改为 ${scope}${ids.length ? `（${ids.join('、')}）` : ''}。` }
+          } catch (error) {
+            return { kind: 'error', text: String(error?.message ?? error) }
+          }
+        }
 
         if (action === 'status') {
           const on = await applyAgentMode(agent)

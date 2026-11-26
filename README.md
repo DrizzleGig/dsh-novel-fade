@@ -215,7 +215,7 @@ memo_digest(dir, book, chapter, path="正文/第12章.md", cards=[...], sheet={.
 | 数据目录 | `<工作区>/.dsh-novel-fade/<book>/`（书库索引在 `<DSH_HOME>/dsh-novel-fade/library.json`） |
 | 记忆分层 | L0 硬契约 / L1 事件 / L2 近期上下文 / L3 归档 |
 | 衰减 | `accessibility` 随章衰减；0.55 是 precise 的分界；L0 不衰减 |
-| 测试 | `npm test` 283/283 |
+| 测试 | `npm test` 284/284 |
 | 默认状态 | 关闭（`/memo on` 启用） |
 | 许可 | MIT |
 

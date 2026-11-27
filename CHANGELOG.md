@@ -2,7 +2,7 @@
 
 - `lib/beat.js` 的 `SUPPORTED_BEAT_SCHEMA` 从 `[1,2]` 扩到 `[1,2,3]`；beat 0.12 写 schemaVersion 3 时，fade 的只读 canon/obligations/decisions 上下文不再被静默丢弃。
 - 只读字段形状未变；未来版本（>=4）仍明确 `unsupported`，不自动放行。
-- 新增 schema 3 适配测试；`npm test` 285/285。
+- 新增 schema 3 适配与 malformed-v3 降级测试；`npm test` 286/286。
 
 ## 0.8.2 — 2026-11-26 · 巩固、归档与只读诊断（已发布 npm 2026-11-26T09:58:11Z）
 

@@ -452,6 +452,26 @@ test('beat adapter: schemaVersion 3（beat 0.12）照样接，只读 canon/oblig
   }
 })
 
+test('beat adapter: v3 decisions 形状损坏时中性降级，不抛错', async () => {
+  const dir = await tempDir()
+  try {
+    const beatDir = join(dir, '.dsh-novel-beat', BOOK)
+    await mkdir(beatDir, { recursive: true })
+    await writeFile(join(beatDir, 'book.json'), JSON.stringify({
+      schemaVersion: 3,
+      canon: [{ entity: '陈凡', key: '魂技', value: '雷霆之力', chapter: 8 }],
+      obligations: [],
+      decisions: {},
+    }), 'utf8')
+    const linked = await readBeatBook(dir, BOOK)
+    assert.equal(linked.status, 'linked')
+    const brief = buildBrief({ memory: makeMemory(), beat: linked, chapter: 9 })
+    assert.match(brief.markdown, /陈凡·魂技：雷霆之力/)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
 test('beat adapter: 未知 schemaVersion 仍然拒接，不会瞎读', async () => {
   const dir = await tempDir()
   try {

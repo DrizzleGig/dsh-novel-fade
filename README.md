@@ -4,7 +4,7 @@
 [![license](https://img.shields.io/badge/license-MIT-blue)](https://github.com/DrizzleGig/dsh-novel-fade/blob/main/LICENSE)
 [![stars](https://img.shields.io/github/stars/DrizzleGig/dsh-novel-fade)](https://github.com/DrizzleGig/dsh-novel-fade/stargazers)
 
-## 本版本（v0.8.2，2026-11-26）
+## 本版本（v0.8.3，2026-11-27）
 
 **新增记忆体检、记忆整理与双库隔离机制。**
 
@@ -207,7 +207,7 @@ memo_digest(dir, book, chapter, path="正文/第12章.md", cards=[...], sheet={.
 | 插件列表名 | 褪色 |
 | 面板名 | 长篇记忆 |
 | 包名 | `dsh-novel-fade` |
-| 版本 | v0.8.2 |
+| 版本 | v0.8.3 |
 | 运行环境 | Node.js ≥ 20 |
 | 外部依赖 | 零依赖（右栏只用 DSH 官方 `sidebarRight*`，不依赖第三方侧栏插件） |
 | 工具 | 十个 `memo_*` |

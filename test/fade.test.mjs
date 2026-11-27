@@ -428,6 +428,30 @@ test('beat adapter: schemaVersion 2 的 beat 0.7 账本照样接（只读 canon/
   }
 })
 
+test('beat adapter: schemaVersion 3（beat 0.12）照样接，只读 canon/obligations', async () => {
+  const dir = await tempDir()
+  try {
+    const beatDir = join(dir, '.dsh-novel-beat', BOOK)
+    await mkdir(beatDir, { recursive: true })
+    await writeFile(join(beatDir, 'book.json'), JSON.stringify({
+      schemaVersion: 3,
+      canon: [{ entity: '陈凡', key: '魂技', value: '雷霆之力', chapter: 8 }],
+      obligations: [{ id: 'ob-9', text: '回天斗城', dueChapter: 9, status: 'open' }],
+      decisions: [],
+      segments: [],
+      requests: [],
+    }), 'utf8')
+    const linked = await readBeatBook(dir, BOOK)
+    assert.equal(linked.status, 'linked')
+    assert.equal(linked.warning, null)
+    const brief = buildBrief({ memory: makeMemory(), beat: linked, chapter: 9 })
+    assert.match(brief.markdown, /陈凡·魂技：雷霆之力/)
+    assert.match(brief.markdown, /回天斗城/)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
 test('beat adapter: 未知 schemaVersion 仍然拒接，不会瞎读', async () => {
   const dir = await tempDir()
   try {

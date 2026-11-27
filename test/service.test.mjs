@@ -13,7 +13,7 @@ import { createFadeService } from '../lib/service.js'
 import { bookFilePath, getSessionMode, mutateMemory, readMemory } from '../lib/store.js'
 
 const BOOK = '雨夜服务测试'
-const VERSION = '0.8.2'
+const VERSION = '0.8.3'
 const SCENE = { location: '枯井', entities: ['林川'], props: ['钥匙'] }
 const TEXT = '林川走到枯井边，把钥匙放在石沿上。雨落在油纸伞上。他转身走进雨里。'
 

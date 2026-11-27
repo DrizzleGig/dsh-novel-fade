@@ -1,5 +1,5 @@
 /**
- * dsh-novel-fade — 有损记忆 / 小说记忆插件（v0.8.2）
+ * dsh-novel-fade — 有损记忆 / 小说记忆插件（v0.8.3）
  *
  * 独立运行：不 import beat，不调用 beat 工具。
  * 装了 dsh-novel-beat 时，只读 <dir>/.dsh-novel-beat/<book>/book.json 做增强。
@@ -14,7 +14,7 @@ import {
 import { memoryState } from './lib/state.js'
 import { createFadeService } from './lib/service.js'
 
-const VERSION = '0.8.2'
+const VERSION = '0.8.3'
 
 export const inject = ['tools', 'commands', 'workingDirectory', 'agents']
 
